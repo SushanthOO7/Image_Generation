@@ -1,0 +1,10 @@
+model_id: black-forest-labs/FLUX.2-dev
+model_version: flux2-dev-bf16-v1
+precision: bfloat16
+device: cuda
+enable_cpu_offload: true
+default_width: 1024
+default_height: 1024
+default_num_inference_steps: 28
+default_guidance_scale: 3.5
+local_files_only: true

@@ -1,39 +1,77 @@
 services:
   api:
-    image: python:3.12-slim
+    build:
+      context: ./backend
     working_dir: /app
-    command: python -c "print('Stage 1 API placeholder. FastAPI starts in Stage 2.')"
+    command: >
+      python -m debugpy
+      --listen 0.0.0.0:5678
+      -m uvicorn backend.app.main:app
+      --host 0.0.0.0
+      --port 8000
+      --reload
     env_file:
       - .env
     volumes:
-      - ./backend:/app/backend:ro
+      - ./backend:/app/backend
+      - ./model_configs:/app/model_configs:ro
+    ports:
+      - "${API_PORT:-8000}:8000"
+      - "5678:5678"
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
 
   worker:
-    image: python:3.12-slim
+    profiles:
+      - local-worker
+    build:
+      context: .
+      dockerfile: worker/Dockerfile
     working_dir: /app
-    command: python -c "print('Stage 1 worker placeholder. Celery starts in Stage 4.')"
+    command: >
+      python -m debugpy
+      --listen 0.0.0.0:5679
+      -m celery
+      -A worker.app.celery_app
+      worker
+      --loglevel=info
+      -Q generation:high,generation:normal,generation:low
+      -c 1
     env_file:
       - .env
     volumes:
-      - ./worker:/app/worker:ro
+      - ./backend:/app/backend
+      - ./model_configs:/app/model_configs
+      - ./worker:/app/worker
       - ${HOST_MODEL_ROOT:-./models}:/models:ro
+    ports:
+      - "5679:5679"
+      
     depends_on:
-      - redis
-      - minio
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      minio:
+        condition: service_started
 
   frontend:
-    image: node:22-slim
+    build:
+      context: ./frontend
     working_dir: /app
-    command: sh -c "echo 'Stage 1 frontend placeholder. Next.js app starts in Stage 6.'"
+    command: npm run dev
     env_file:
       - .env
+    environment:
+      NEXT_PUBLIC_API_URL: ${API_PUBLIC_URL:-http://localhost:8000}
     volumes:
-      - ./frontend:/app:ro
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
     ports:
-      - "${FRONTEND_PORT:-3001}:3001"
+      - "${FRONTEND_PORT:-3001}:${FRONTEND_PORT:-3001}"
 
   postgres:
     image: postgres:17-alpine
@@ -44,7 +82,22 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-flux} -d $${POSTGRES_DB:-flux_platform}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  adminer:
+    image: adminer:4.8.1
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
 
   redis:
     image: redis:7.4-alpine
@@ -52,7 +105,7 @@ services:
     volumes:
       - redis_data:/data
     ports:
-      - "6380:6380"
+      - "6380:6379"
 
   minio:
     image: minio/minio:RELEASE.2024-12-18T13-15-44Z
@@ -70,3 +123,4 @@ volumes:
   postgres_data:
   redis_data:
   minio_data:
+  frontend_node_modules:

@@ -1,0 +1,14 @@
+fast:
+  steps: 18
+  guidance: 3.0
+  candidates: 1
+
+standard:
+  steps: 28
+  guidance: 3.5
+  candidates: 2
+
+ultra:
+  steps: 40
+  guidance: 4.0
+  candidates: 4

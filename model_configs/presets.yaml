@@ -1,0 +1,16 @@
+none:
+
+cinematic:
+  lighting: cinematic directional lighting
+  composition: film still composition
+  detail: rich atmosphere and natural depth
+
+product:
+  lighting: clean studio lighting
+  composition: premium product photography composition
+  detail: crisp material detail and controlled reflections
+
+editorial:
+  lighting: soft editorial lighting
+  composition: magazine cover composition
+  detail: tasteful styling and refined color grading

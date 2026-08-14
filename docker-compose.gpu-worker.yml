@@ -1,0 +1,26 @@
+services:
+  worker:
+    build:
+      context: .
+      dockerfile: worker/Dockerfile.gpu
+    working_dir: /app
+    command: >
+      python3.12 -m celery
+      -A worker.app.celery_app
+      worker
+      --loglevel=info
+      -Q generation:high,generation:normal,generation:low
+      -c 1
+    env_file:
+      - path: .env.gpu-worker
+        required: false
+    volumes:
+      - ./model_configs:/app/model_configs:ro
+      - ${HOST_MODEL_ROOT:-./models}:/models
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
