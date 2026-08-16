@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import os
 from pathlib import Path
 from typing import Any
 
@@ -24,6 +25,10 @@ class FluxModelManager:
         if self.pipeline is not None:
             return self.pipeline
 
+        if bool(self.config.get("enable_parallel_loading", False)):
+            os.environ["HF_ENABLE_PARALLEL_LOADING"] = "true"
+            os.environ["HF_PARALLEL_LOADING_WORKERS"] = str(self.config.get("parallel_loading_workers", 8))
+
         import torch
         from diffusers import DiffusionPipeline
 
@@ -43,7 +48,12 @@ class FluxModelManager:
         load_kwargs: dict[str, Any] = {
             "dtype": torch_dtype,
             "local_files_only": bool(self.config.get("local_files_only", True)),
+            "low_cpu_mem_usage": bool(self.config.get("low_cpu_mem_usage", True)),
         }
+        if "use_safetensors" in self.config:
+            load_kwargs["use_safetensors"] = bool(self.config["use_safetensors"])
+        if "disable_mmap" in self.config:
+            load_kwargs["disable_mmap"] = bool(self.config["disable_mmap"])
         if device_map:
             load_kwargs["device_map"] = str(device_map)
         if max_memory:

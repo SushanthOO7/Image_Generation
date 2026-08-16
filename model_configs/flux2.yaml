@@ -6,6 +6,11 @@ device_map: balanced
 max_memory_gpu_0: 76GiB
 max_memory_gpu_1: 76GiB
 enable_cpu_offload: false
+enable_parallel_loading: true
+parallel_loading_workers: 8
+low_cpu_mem_usage: true
+use_safetensors: true
+disable_mmap: false
 default_width: 1024
 default_height: 1024
 default_num_inference_steps: 28

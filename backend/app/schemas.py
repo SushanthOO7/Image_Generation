@@ -66,6 +66,7 @@ class GenerationImage(BaseModel):
 class GenerationStatusResponse(BaseModel):
     job_id: str
     status: GenerationStatus
+    status_message: str | None = None
     progress: float = Field(ge=0, le=1)
     prompt: str
     expanded_prompt: str | None = None

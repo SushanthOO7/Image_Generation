@@ -29,6 +29,7 @@ type GenerationImage = {
 type GenerationResponse = {
   job_id: string;
   status: GenerationStatus;
+  status_message: string | null;
   progress: number;
   prompt: string;
   expanded_prompt: string | null;
@@ -132,7 +133,8 @@ export default function Home() {
 
   const progressLabel = useMemo(() => {
     if (!job) return "Waiting";
-    return `${job.status} - ${Math.round(job.progress * 100)}%`;
+    const stage = job.status_message ? ` - ${job.status_message}` : "";
+    return `${job.status}${stage} - ${Math.round(job.progress * 100)}%`;
   }, [job]);
 
   async function checkHealth() {
@@ -303,6 +305,7 @@ export default function Home() {
       setJob({
         job_id: data.job_id,
         status: data.status,
+        status_message: data.status === "QUEUED" ? "Queued" : null,
         progress: data.status === "QUEUED" ? 0.05 : 0,
         prompt,
         expanded_prompt: null,
@@ -679,6 +682,10 @@ export default function Home() {
             <div>
               <dt>Candidates</dt>
               <dd>{job?.candidate_count ?? 1}</dd>
+            </div>
+            <div>
+              <dt>Stage</dt>
+              <dd>{job?.status_message ?? "Waiting"}</dd>
             </div>
           </dl>
 

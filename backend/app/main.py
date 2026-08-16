@@ -89,6 +89,7 @@ def generation_response(job) -> GenerationStatusResponse:
     return GenerationStatusResponse(
         job_id=job.id,
         status=GenerationStatus(job.status),
+        status_message=job.status_message,
         progress=job.progress,
         prompt=job.original_prompt,
         expanded_prompt=job.expanded_prompt,

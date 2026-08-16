@@ -55,6 +55,7 @@ def create_generation_job(
         guidance=plan.guidance,
         candidate_count=plan.candidate_count,
         status=GenerationStatus.queued.value,
+        status_message="Queued",
         progress=0.05,
     )
     db.add(job)
@@ -101,6 +102,7 @@ def cancel_generation_job(db: Session, job: GenerationJob) -> GenerationJob:
         return job
 
     job.status = GenerationStatus.cancelled.value
+    job.status_message = "Cancelled"
     job.progress = 1.0
     job.completed_at = datetime.now(UTC)
     db.commit()
@@ -120,9 +122,26 @@ def mark_generation_running(db: Session, job: GenerationJob) -> GenerationJob:
         return job
 
     job.status = GenerationStatus.generating.value
+    job.status_message = "Starting worker"
     job.progress = 0.5
     job.started_at = job.started_at or datetime.now(UTC)
 
+    db.commit()
+    db.refresh(job)
+    return get_generation_job(db, job.id) or job
+
+
+def update_generation_progress(
+    db: Session,
+    job: GenerationJob,
+    progress: float,
+    status_message: str,
+) -> GenerationJob:
+    if job.status == GenerationStatus.cancelled.value:
+        return job
+
+    job.progress = max(0.0, min(progress, 0.99))
+    job.status_message = status_message
     db.commit()
     db.refresh(job)
     return get_generation_job(db, job.id) or job
@@ -132,13 +151,16 @@ def complete_generation_with_outputs(
     db: Session,
     job: GenerationJob,
     outputs: list[dict[str, object]],
+    generation_time_ms: int | None = None,
 ) -> GenerationJob:
     if job.status == GenerationStatus.cancelled.value:
         return job
 
     job.status = GenerationStatus.completed.value
+    job.status_message = "Completed"
     job.progress = 1.0
     job.completed_at = datetime.now(UTC)
+    job.generation_time_ms = generation_time_ms
     if not job.outputs:
         selected_index = max(
             range(len(outputs)),
@@ -217,6 +239,7 @@ def mark_generation_failed(
     error_message: str,
 ) -> GenerationJob:
     job.status = GenerationStatus.failed.value
+    job.status_message = "Failed"
     job.progress = 1.0
     job.completed_at = datetime.now(UTC)
     job.error_code = error_code

@@ -7,6 +7,7 @@ from backend.app.repositories import (
     get_generation_job,
     mark_generation_failed,
     mark_generation_running,
+    update_generation_progress,
 )
 from backend.app.schemas import GenerationStatus
 from worker.app.celery_app import celery_app
@@ -29,6 +30,7 @@ def get_cached_generator(settings):
 
 @celery_app.task(name="worker.generate_image")
 def generate_image(job_id: str) -> dict[str, str]:
+    started_at = time.perf_counter()
     db = SessionLocal()
     try:
         job = get_generation_job(db, job_id)
@@ -52,10 +54,25 @@ def generate_image(job_id: str) -> dict[str, str]:
 
         settings = load_worker_settings()
         storage = ObjectStorage(settings)
+        job = update_generation_progress(db, job, 0.15, "Loading model")
         generator = get_cached_generator(settings)
+        job = get_generation_job(db, job_id)
+        if job is None:
+            return {"job_id": job_id, "status": "NOT_FOUND"}
+        if job.status == GenerationStatus.cancelled.value:
+            return {"job_id": job_id, "status": job.status}
+
+        job = update_generation_progress(db, job, 0.3, "Model ready")
         candidate_outputs: list[dict[str, object]] = []
         candidate_count = max(1, min(job.candidate_count, 4))
         for candidate_index in range(1, candidate_count + 1):
+            generation_progress = 0.3 + ((candidate_index - 1) / candidate_count) * 0.55
+            job = update_generation_progress(
+                db,
+                job,
+                generation_progress,
+                f"Generating candidate {candidate_index} of {candidate_count}",
+            )
             generated = generator.generate(job, candidate_index=candidate_index)
             job = get_generation_job(db, job_id)
             if job is None:
@@ -63,6 +80,13 @@ def generate_image(job_id: str) -> dict[str, str]:
             if job.status == GenerationStatus.cancelled.value:
                 return {"job_id": job_id, "status": job.status}
 
+            upload_progress = 0.3 + (candidate_index / candidate_count) * 0.55
+            job = update_generation_progress(
+                db,
+                job,
+                upload_progress,
+                f"Uploading candidate {candidate_index} of {candidate_count}",
+            )
             candidate_key = generation_object_key(job.id, f"candidate-{candidate_index}.webp")
             storage.upload_webp(candidate_key, generated.image_bytes)
 
@@ -87,11 +111,13 @@ def generate_image(job_id: str) -> dict[str, str]:
                 }
             )
 
+        job = update_generation_progress(db, job, 0.9, "Ranking candidates")
         selected_candidate = max(candidate_outputs, key=lambda output: float(output["final_score"]))
         thumbnail_bytes = render_thumbnail(bytes(selected_candidate["image_bytes"]))
         final_key = generation_object_key(job.id, "final.webp")
         thumbnail_key = generation_object_key(job.id, "thumbnail.webp")
 
+        job = update_generation_progress(db, job, 0.95, "Uploading final image")
         storage.upload_webp(final_key, bytes(selected_candidate["image_bytes"]))
         storage.upload_webp(thumbnail_key, thumbnail_bytes)
         for output in candidate_outputs:
@@ -102,6 +128,7 @@ def generate_image(job_id: str) -> dict[str, str]:
             db,
             job,
             candidate_outputs,
+            generation_time_ms=int((time.perf_counter() - started_at) * 1000),
         )
         return {"job_id": job_id, "status": completed.status}
     except Exception as exc:
