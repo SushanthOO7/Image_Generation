@@ -1,4 +1,5 @@
 import time
+from typing import Any
 
 from backend.app.database import SessionLocal
 from backend.app.repositories import (
@@ -13,6 +14,17 @@ from worker.app.generation import build_image_generator
 from worker.app.image_renderer import render_thumbnail
 from worker.app.settings import load_worker_settings
 from worker.app.storage import ObjectStorage, generation_object_key
+
+_GENERATOR_CACHE: dict[tuple[str, str, str], Any] = {}
+
+
+def get_cached_generator(settings):
+    cache_key = (settings.generation_backend, settings.model_root, settings.flux_config_path)
+    generator = _GENERATOR_CACHE.get(cache_key)
+    if generator is None:
+        generator = build_image_generator(settings)
+        _GENERATOR_CACHE[cache_key] = generator
+    return generator
 
 
 @celery_app.task(name="worker.generate_image")
@@ -40,7 +52,7 @@ def generate_image(job_id: str) -> dict[str, str]:
 
         settings = load_worker_settings()
         storage = ObjectStorage(settings)
-        generator = build_image_generator(settings)
+        generator = get_cached_generator(settings)
         candidate_outputs: list[dict[str, object]] = []
         candidate_count = max(1, min(job.candidate_count, 4))
         for candidate_index in range(1, candidate_count + 1):

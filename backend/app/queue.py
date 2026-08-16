@@ -11,5 +11,10 @@ celery_app = Celery(
 )
 
 
-def enqueue_generation(job_id: str) -> None:
-    celery_app.send_task("worker.generate_image", args=[job_id], queue="generation:normal")
+def enqueue_generation(job_id: str) -> str:
+    task = celery_app.send_task("worker.generate_image", args=[job_id], queue="generation:normal")
+    return task.id
+
+
+def terminate_generation_task(task_id: str) -> None:
+    celery_app.control.revoke(task_id, terminate=True, signal="SIGKILL")

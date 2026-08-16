@@ -75,6 +75,30 @@ const examples = [
   "A velvet armchair floating above a neon canyon",
 ];
 
+function formatUtcTimestamp(value: string) {
+  return value.replace("T", " ").replace(/\.\d+Z$/, " UTC").replace("Z", " UTC");
+}
+
+async function apiErrorMessage(response: Response, fallback: string) {
+  try {
+    const data = await response.json();
+    if (typeof data.detail === "string") {
+      return data.detail;
+    }
+    if (Array.isArray(data.detail)) {
+      return data.detail
+        .map((item: { loc?: unknown[]; msg?: string }) => {
+          const location = Array.isArray(item.loc) ? item.loc.join(".") : "field";
+          return `${location}: ${item.msg ?? "Invalid value"}`;
+        })
+        .join("; ");
+    }
+  } catch {
+    return fallback;
+  }
+  return fallback;
+}
+
 export default function Home() {
   const [prompt, setPrompt] = useState(examples[0]);
   const [quality, setQuality] = useState("fast");
@@ -152,7 +176,12 @@ export default function Home() {
       });
 
       if (!response.ok) {
-        throw new Error(`${authMode === "login" ? "Login" : "Register"} failed with HTTP ${response.status}`);
+        throw new Error(
+          await apiErrorMessage(
+            response,
+            `${authMode === "login" ? "Login" : "Register"} failed with HTTP ${response.status}`,
+          ),
+        );
       }
 
       const data = (await response.json()) as AuthResponse;
@@ -528,13 +557,14 @@ export default function Home() {
               Generate
             </button>
             <button
-              className="iconButton"
+              className="stopButton"
               type="button"
               onClick={cancelGeneration}
-              title="Cancel active job"
+              title="Stop active generation"
               disabled={!canCancel || isCancelling}
             >
               {isCancelling ? <Loader2 className="spin" size={18} /> : <XCircle size={18} />}
+              Stop
             </button>
             <button className="iconButton" type="button" onClick={checkHealth} title="Refresh API health">
               <RefreshCcw size={18} />
@@ -584,7 +614,7 @@ export default function Home() {
                             <strong>{item.prompt}</strong>
                             <small>
                               {item.status} - {item.width && item.height ? `${item.width} x ${item.height}` : "pending"} -{" "}
-                              {new Date(item.created_at).toLocaleString()}
+                              {formatUtcTimestamp(item.created_at)}
                             </small>
                           </span>
                         </button>

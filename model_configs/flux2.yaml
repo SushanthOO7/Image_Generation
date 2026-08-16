@@ -2,7 +2,10 @@ model_id: black-forest-labs/FLUX.2-dev
 model_version: flux2-dev-bf16-v1
 precision: bfloat16
 device: cuda
-enable_cpu_offload: true
+device_map: balanced
+max_memory_gpu_0: 76GiB
+max_memory_gpu_1: 76GiB
+enable_cpu_offload: false
 default_width: 1024
 default_height: 1024
 default_num_inference_steps: 28

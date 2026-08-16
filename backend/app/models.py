@@ -38,6 +38,7 @@ class GenerationJob(Base):
     guidance: Mapped[float | None] = mapped_column(Float, nullable=True)
     seed: Mapped[int | None] = mapped_column(Integer, nullable=True)
     candidate_count: Mapped[int] = mapped_column(Integer, default=1)
+    celery_task_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     status: Mapped[str] = mapped_column(String(32), index=True)
     progress: Mapped[float] = mapped_column(Float, default=0.0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)

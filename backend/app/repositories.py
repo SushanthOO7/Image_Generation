@@ -108,6 +108,13 @@ def cancel_generation_job(db: Session, job: GenerationJob) -> GenerationJob:
     return get_generation_job(db, job.id) or job
 
 
+def set_generation_task_id(db: Session, job: GenerationJob, task_id: str) -> GenerationJob:
+    job.celery_task_id = task_id
+    db.commit()
+    db.refresh(job)
+    return get_generation_job(db, job.id) or job
+
+
 def mark_generation_running(db: Session, job: GenerationJob) -> GenerationJob:
     if job.status == GenerationStatus.cancelled.value:
         return job

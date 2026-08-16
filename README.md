@@ -49,6 +49,7 @@ Included now:
 - GPU worker Dockerfile in `worker/Dockerfile.gpu`.
 - FLUX.2 download helper in `scripts/download_flux2.py`.
 - Remote GPU worker setup guide in `docs/GPU_WORKER_SETUP.md`.
+- Direct Python GPU worker path uses the same `.env.gpu-worker` file as Docker.
 - FLUX generator now uses planned job width, height, steps, and guidance.
 - Optional ML dependency file in `worker/requirements-ml.txt`.
 - Dependency manifests for backend, worker, and frontend.

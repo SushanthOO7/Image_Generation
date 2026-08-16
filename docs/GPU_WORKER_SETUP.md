@@ -5,7 +5,7 @@ The API does not generate images directly. It writes a job to PostgreSQL and pus
 ## 1. Server Requirements
 
 - NVIDIA GPU with recent drivers.
-- NVIDIA Container Toolkit installed.
+- NVIDIA Container Toolkit installed if you run the worker with Docker. It is not needed for the direct Python worker path.
 - Docker and Docker Compose.
 - Enough disk for model weights. `black-forest-labs/FLUX.2-dev` is gated and large; the Hugging Face file list includes a 64 GB safetensors file and the model card says full inference can require more than 80 GB VRAM without offload.
 - A Hugging Face account that has accepted the FLUX.2-dev model license.
@@ -123,7 +123,97 @@ python3 -c "import os, socket; socket.create_connection((os.environ['MAIN_SERVER
 python3 -c "import os, socket; socket.create_connection((os.environ['MAIN_SERVER_IP'], 8000), 5); print('api ok')"
 ```
 
-## 5. Create GPU Worker Env
+## 5. Direct Python Worker Path
+
+Use this path when you do not have Docker admin access on the GPU server.
+
+On the GPU server, confirm Python and the NVIDIA driver are available:
+
+```bash
+python3 --version
+nvidia-smi
+git --version
+```
+
+Clone or copy this repository onto the GPU server, then enter it:
+
+```bash
+cd /path/to/Image_Generation
+```
+
+Create a virtual environment:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+```
+
+Install the GPU worker dependencies:
+
+```bash
+pip install -r worker/requirements-ml.txt
+```
+
+Create the GPU worker env file:
+
+```bash
+cp .env.gpu-worker.example .env.gpu-worker
+nano .env.gpu-worker
+```
+
+Set `HF_TOKEN` and verify the main server IP values. Then load it:
+
+```bash
+set -a
+source .env.gpu-worker
+set +a
+```
+
+Test connectivity from the GPU server:
+
+```bash
+python3 -c "import os, socket; socket.create_connection(('10.218.64.88', 5433), 5); print('postgres ok')"
+python3 -c "import os, socket; socket.create_connection(('10.218.64.88', 6380), 5); print('redis ok')"
+python3 -c "import os, socket; socket.create_connection(('10.218.64.88', 9000), 5); print('minio ok')"
+```
+
+Download the model:
+
+```bash
+python scripts/download_flux2.py
+```
+
+Start the worker:
+
+```bash
+celery -A worker.app.celery_app worker --loglevel=info -Q generation:high,generation:normal,generation:low -c 1
+```
+
+Keep this terminal open. When you click Generate in the UI, this worker should log that it received `worker.generate_image`.
+
+For a longer-running session on a loaner server, use `tmux` if available:
+
+```bash
+tmux new -s flux-worker
+source .venv/bin/activate
+set -a
+source .env.gpu-worker
+set +a
+celery -A worker.app.celery_app worker --loglevel=info -Q generation:high,generation:normal,generation:low -c 1
+```
+
+Detach from tmux with `Ctrl+b`, then `d`. Reattach with:
+
+```bash
+tmux attach -t flux-worker
+```
+
+## 6. Docker GPU Worker Path
+
+Use this only if Docker is available on the GPU server.
+
+### Create GPU Worker Env
 
 On the GPU server, copy `.env.gpu-worker.example` to `.env.gpu-worker`:
 
@@ -155,7 +245,7 @@ FLUX_MODEL_ID=black-forest-labs/FLUX.2-dev
 
 Replace `MAIN_SERVER_IP` with the server running `postgres`, `redis`, and `minio`.
 
-## 6. Download The Model
+### Download The Model
 
 First accept access on Hugging Face for `black-forest-labs/FLUX.2-dev`.
 
@@ -174,7 +264,7 @@ The model downloads under:
 
 The worker config uses `local_files_only: true`, so generation will use local files after download.
 
-## 7. Start The GPU Worker
+### Start The GPU Worker
 
 On the GPU server:
 
@@ -190,7 +280,7 @@ docker compose up -d frontend api postgres redis minio adminer
 
 When you click Generate in the UI, the API enqueues the job to Redis. The GPU worker pulls the job and generates the image.
 
-## 8. Switch Back To Mock
+## 7. Switch Back To Mock
 
 Set this in `.env.gpu-worker`:
 

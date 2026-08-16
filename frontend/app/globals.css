@@ -254,6 +254,7 @@ select:focus {
 }
 
 .primaryButton,
+.stopButton,
 .iconButton,
 .openImage,
 .feedbackButton {
@@ -265,6 +266,19 @@ select:focus {
   justify-content: center;
   min-height: 44px;
   text-decoration: none;
+}
+
+.stopButton {
+  background: rgba(255, 177, 156, 0.1);
+  border: 1px solid rgba(255, 177, 156, 0.38);
+  color: #ffb19c;
+  font-weight: 800;
+  padding: 0 14px;
+}
+
+.stopButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
 .primaryButton {

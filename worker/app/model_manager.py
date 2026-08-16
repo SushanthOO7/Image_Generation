@@ -37,17 +37,34 @@ class FluxModelManager:
         model_id = str(self.config["model_id"])
         local_model_path = Path(self.settings.model_root) / model_id.replace("/", "--")
         model_path = str(local_model_path) if local_model_path.exists() else model_id
+        device_map = self.config.get("device_map")
+        max_memory = self._max_memory_config()
 
-        self.pipeline = Flux2Pipeline.from_pretrained(
-            model_path,
-            torch_dtype=torch_dtype,
-            local_files_only=bool(self.config.get("local_files_only", True)),
-        )
+        load_kwargs: dict[str, Any] = {
+            "dtype": torch_dtype,
+            "local_files_only": bool(self.config.get("local_files_only", True)),
+        }
+        if device_map:
+            load_kwargs["device_map"] = str(device_map)
+        if max_memory:
+            load_kwargs["max_memory"] = max_memory
+
+        self.pipeline = Flux2Pipeline.from_pretrained(model_path, **load_kwargs)
+        if device_map:
+            return self.pipeline
         if bool(self.config.get("enable_cpu_offload", False)):
             self.pipeline.enable_model_cpu_offload()
         else:
             self.pipeline.to(str(self.config.get("device", "cuda")))
         return self.pipeline
+
+    def _max_memory_config(self) -> dict[int, str]:
+        max_memory: dict[int, str] = {}
+        for index in range(8):
+            value = self.config.get(f"max_memory_gpu_{index}")
+            if value:
+                max_memory[index] = str(value)
+        return max_memory
 
     def unload(self) -> None:
         self.pipeline = None

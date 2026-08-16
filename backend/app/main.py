@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from backend.app.auth import create_access_token, get_current_user, hash_password, verify_password
 from backend.app.database import get_db
 from backend.app.models import User
-from backend.app.queue import enqueue_generation
+from backend.app.queue import enqueue_generation, terminate_generation_task
 from backend.app.rate_limits import check_generation_rate_limit
 from backend.app.repositories import (
     archive_generation_job,
@@ -18,6 +18,7 @@ from backend.app.repositories import (
     list_generation_jobs,
     mark_generation_failed,
     select_generation_output,
+    set_generation_task_id,
 )
 from backend.app.repositories import cancel_generation_job, create_generation_feedback
 from backend.app.schemas import (
@@ -35,6 +36,7 @@ from backend.app.schemas import (
     GenerationStatus,
     GenerationStatusResponse,
     GenerationSubmitResponse,
+    LoginRequest,
     SelectOutputRequest,
     SelectOutputResponse,
     UserResponse,
@@ -114,7 +116,7 @@ def register(
 
 @app.post("/v1/auth/login", response_model=AuthResponse)
 def login(
-    request: AuthRequest,
+    request: LoginRequest,
     db: Session = Depends(get_db),
 ) -> AuthResponse:
     user = get_user_by_email(db, request.email)
@@ -177,7 +179,8 @@ def submit_generation(
         quality_presets_path=settings.quality_presets_path,
     )
     try:
-        enqueue_generation(job.id)
+        task_id = enqueue_generation(job.id)
+        job = set_generation_task_id(db, job, task_id)
     except KombuError as exc:
         job = mark_generation_failed(db, job, "QUEUE_UNAVAILABLE", str(exc))
     return GenerationSubmitResponse(job_id=job.id, status=GenerationStatus(job.status))
@@ -230,7 +233,10 @@ def cancel_generation(
     if job.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="Generation job not found")
 
+    task_id = job.celery_task_id
     job = cancel_generation_job(db, job)
+    if task_id:
+        terminate_generation_task(task_id)
     return CancelGenerationResponse(job_id=job.id, status=GenerationStatus(job.status))
 
 
