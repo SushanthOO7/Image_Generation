@@ -1,0 +1,648 @@
+/* [project]/app/globals.css [app-client] (css) */
+:root {
+  --background: #fff;
+  --foreground: #000;
+  --muted: #f5f5f5;
+  --muted-foreground: #525252;
+  --border-light: #e5e5e5;
+  --border: #000;
+  --surface-inverted: #000;
+  --surface-inverted-foreground: #fff;
+  --radius: 0px;
+  --ease: ease;
+  background: var(--background);
+  color: var(--foreground);
+  --lightningcss-light: initial;
+  --lightningcss-dark: ;
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--background);
+  scroll-behavior: smooth;
+}
+
+body {
+  background: repeating-linear-gradient(0deg, #00000005 0 1px, transparent 1px 28px),
+    var(--background);
+  min-height: 100vh;
+  margin: 0;
+  font-family: "Source Serif 4", Georgia, serif;
+}
+
+button, input, select, textarea {
+  border-radius: var(--radius);
+  font: inherit;
+}
+
+button, a, select {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 3px solid var(--border);
+  outline-offset: 3px;
+}
+
+.appShell {
+  max-width: 1560px;
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: 0 28px 44px;
+}
+
+.topbar {
+  border-bottom: 2px solid var(--border);
+  z-index: 10;
+  background: #fffffff0;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 18px;
+  min-height: 64px;
+  display: grid;
+  position: sticky;
+  top: 0;
+}
+
+.brandMark, .topnav a, .systemReadout, .eyebrow, dt, dd, label span, .sectionHeader span, button, select, input, .candidateTile small, .candidateTile span, .historyOpen small {
+  letter-spacing: 0;
+  font-family: JetBrains Mono, monospace;
+}
+
+.brandMark {
+  color: var(--foreground);
+  font-size: 1rem;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.topnav {
+  gap: 22px;
+  display: flex;
+}
+
+.topnav a {
+  color: var(--foreground);
+  font-size: .82rem;
+  text-decoration: none;
+}
+
+.systemReadout {
+  text-transform: uppercase;
+  flex-wrap: wrap;
+  justify-content: end;
+  align-items: center;
+  gap: 14px;
+  font-size: .78rem;
+  display: flex;
+}
+
+.healthPill {
+  align-items: center;
+  gap: 7px;
+  display: inline-flex;
+}
+
+.pageTitle {
+  border-bottom: 4px solid var(--border);
+  padding: 34px 0 22px;
+}
+
+h1, h2 {
+  letter-spacing: 0;
+  margin: 0;
+  font-family: Playfair Display, Georgia, serif;
+  font-weight: 700;
+  line-height: .95;
+}
+
+h1 {
+  font-size: clamp(4.6rem, 13vw, 13rem);
+}
+
+h2 {
+  font-size: clamp(2.2rem, 5vw, 5.5rem);
+}
+
+.eyebrow {
+  color: var(--muted-foreground);
+  text-transform: uppercase;
+  margin: 0 0 9px;
+  font-size: .72rem;
+  font-weight: 800;
+}
+
+.workspace {
+  border-bottom: 2px solid var(--border);
+  grid-template-columns: minmax(320px, 38%) 1fr;
+  align-items: start;
+  gap: 0;
+  min-height: 760px;
+  display: grid;
+}
+
+.controlPanel {
+  border-right: 2px solid var(--border);
+  gap: 20px;
+  padding: 22px 24px 22px 0;
+  display: grid;
+}
+
+.resultPanel {
+  gap: 18px;
+  padding: 22px 0 22px 28px;
+  display: grid;
+}
+
+.authBox, .monitorPanel {
+  background: var(--muted);
+  border: 1px solid var(--border-light);
+  gap: 14px;
+  padding: 14px;
+  display: grid;
+}
+
+.sectionHeader, .historyHeader, .resultHeader {
+  justify-content: space-between;
+  align-items: start;
+  gap: 14px;
+  display: flex;
+}
+
+.sectionHeader strong {
+  overflow-wrap: anywhere;
+  font-family: JetBrains Mono, monospace;
+  font-size: .82rem;
+  display: block;
+}
+
+.fieldGroup, .authForm, .controlGrid label, .seedControl label {
+  gap: 8px;
+  display: grid;
+}
+
+label, .fieldGroup label {
+  font-family: JetBrains Mono, monospace;
+  font-size: .78rem;
+  font-weight: 800;
+}
+
+textarea, input, select {
+  background: var(--background);
+  border: 1px solid var(--border);
+  color: var(--foreground);
+  transition: border-width 80ms var(--ease), background 80ms var(--ease);
+  outline: none;
+  width: 100%;
+}
+
+textarea {
+  resize: vertical;
+  min-height: 250px;
+  padding: 14px;
+  font-size: 1.18rem;
+  line-height: 1.48;
+}
+
+input, select {
+  min-height: 44px;
+  padding: 0 11px;
+  font-family: JetBrains Mono, monospace;
+}
+
+textarea:focus, input:focus, select:focus {
+  border-width: 2px;
+}
+
+.quickPrompts {
+  border-top: 1px solid var(--border-light);
+  gap: 0;
+  display: grid;
+}
+
+.quickPrompts button, .secondaryButton, .authMode button, .iconButton, .primaryButton, .stopButton, .openImage, .feedbackButton, .historyArchive {
+  background: var(--background);
+  border: 1px solid var(--border);
+  color: var(--foreground);
+  cursor: pointer;
+  min-height: 44px;
+  transition: background 80ms var(--ease), color 80ms var(--ease), border-width 80ms var(--ease);
+}
+
+.quickPrompts button {
+  text-align: left;
+  border-width: 0 0 1px;
+  padding: 12px 0;
+  font-family: "Source Serif 4", Georgia, serif;
+  line-height: 1.35;
+}
+
+.quickPrompts button:hover, .secondaryButton:hover, .authMode button.active, .iconButton:hover, .openImage:hover, .feedbackButton:hover:not(:disabled) {
+  background: var(--surface-inverted);
+  color: var(--surface-inverted-foreground);
+}
+
+.authMode, .limitGrid, .metricGrid, .details {
+  gap: 1px;
+  display: grid;
+}
+
+.authMode {
+  border: 1px solid var(--border);
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.authMode button {
+  border: 0;
+}
+
+.limitGrid, .metricGrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 0;
+}
+
+.limitGrid div, .metricGrid div, .details div, .expandedPrompt {
+  border: 1px solid var(--border-light);
+  min-width: 0;
+  padding: 11px;
+}
+
+.controlGrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  display: grid;
+}
+
+.seedControl {
+  grid-template-columns: 1fr 44px;
+  align-items: end;
+  gap: 10px;
+  display: grid;
+}
+
+.actions, .resultActions {
+  flex-wrap: wrap;
+  gap: 10px;
+  display: flex;
+}
+
+.primaryButton, .stopButton, .iconButton, .openImage, .feedbackButton {
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+  text-decoration: none;
+  display: inline-flex;
+}
+
+.primaryButton {
+  background: var(--surface-inverted);
+  border: 2px solid var(--border);
+  color: var(--surface-inverted-foreground);
+  flex: 1;
+  min-height: 54px;
+  font-size: .88rem;
+  font-weight: 900;
+}
+
+.primaryButton:hover:not(:disabled) {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+.stopButton {
+  border-style: dashed;
+}
+
+.iconButton {
+  aspect-ratio: 1;
+  width: 44px;
+  padding: 0;
+}
+
+button:disabled, .feedbackButton:disabled, .iconButton:disabled {
+  cursor: not-allowed;
+  opacity: .45;
+}
+
+.notice {
+  border: 2px solid var(--border);
+  text-transform: uppercase;
+  margin: 0;
+  padding: 12px;
+  font-family: JetBrains Mono, monospace;
+  font-size: .78rem;
+}
+
+.errorText {
+  background: var(--surface-inverted);
+  color: var(--surface-inverted-foreground);
+}
+
+.successText {
+  background: var(--muted);
+}
+
+.resultHeader {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 12px;
+}
+
+.resultHeader h2 {
+  font-size: clamp(2rem, 5.6vw, 7rem);
+}
+
+.resultHeader > span {
+  text-align: right;
+  text-transform: uppercase;
+  max-width: 34ch;
+  font-family: JetBrains Mono, monospace;
+  font-size: .76rem;
+}
+
+.progressTrack {
+  background: var(--muted);
+  border: 1px solid var(--border);
+  height: 14px;
+  overflow: hidden;
+}
+
+.progressTrack div {
+  background: repeating-linear-gradient(90deg, var(--surface-inverted) 0 12px, transparent 12px 18px),
+    var(--surface-inverted);
+  min-width: 8px;
+  height: 100%;
+  transition: width .1s var(--ease);
+}
+
+.resultPanel.idle .progressTrack div {
+  min-width: 0;
+}
+
+.resultPanel.generating .progressTrack div, .resultPanel.queued .progressTrack div {
+  animation: .9s linear infinite progressMarch;
+}
+
+.imageStage {
+  background: var(--muted);
+  border: 1px solid var(--border);
+  justify-content: center;
+  align-items: center;
+  min-height: 420px;
+  max-height: min(76vh, 880px);
+  display: flex;
+  overflow: hidden;
+}
+
+.imageStage img {
+  object-fit: contain;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.emptyImage {
+  text-align: center;
+  justify-items: center;
+  gap: 12px;
+  padding: 28px;
+  display: grid;
+}
+
+.emptyImage span {
+  max-width: 10ch;
+  font-family: Playfair Display, Georgia, serif;
+  font-size: clamp(2.4rem, 6vw, 7rem);
+  line-height: .98;
+}
+
+.emptyImage small {
+  overflow-wrap: anywhere;
+  text-transform: uppercase;
+  font-family: JetBrains Mono, monospace;
+}
+
+.details {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  margin: 0;
+}
+
+dt {
+  color: var(--muted-foreground);
+  margin-bottom: 8px;
+  font-size: .68rem;
+  font-weight: 800;
+}
+
+dd {
+  color: var(--foreground);
+  overflow-wrap: anywhere;
+  margin: 0;
+  font-size: .82rem;
+}
+
+.expandedPrompt {
+  line-height: 1.5;
+  display: block;
+}
+
+.candidateGrid {
+  grid-template-columns: repeat(auto-fill, minmax(126px, 1fr));
+  gap: 12px;
+  display: grid;
+}
+
+.candidateTile {
+  text-align: left;
+  gap: 7px;
+  padding: 8px;
+  display: grid;
+}
+
+.candidateTile.selected {
+  background: var(--surface-inverted);
+  color: var(--surface-inverted-foreground);
+}
+
+.candidateTile img {
+  aspect-ratio: 1;
+  border: 1px solid var(--border);
+  object-fit: cover;
+  width: 100%;
+  display: block;
+}
+
+.candidateTile small {
+  color: inherit;
+  font-size: .68rem;
+}
+
+.historyPanel {
+  padding-top: 42px;
+}
+
+.historyHeader {
+  border-bottom: 4px solid var(--border);
+  margin-bottom: 18px;
+  padding-bottom: 14px;
+}
+
+.historyList {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px;
+  display: grid;
+}
+
+.historyItem {
+  border-top: 1px solid var(--border);
+  gap: 10px;
+  padding-top: 10px;
+  display: grid;
+  position: relative;
+}
+
+.historyItem.active {
+  border-top-width: 4px;
+}
+
+.historyOpen {
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  background: none;
+  border: 0;
+  gap: 10px;
+  padding: 0;
+  display: grid;
+}
+
+.historyOpen img, .historyThumb {
+  aspect-ratio: 1;
+  background: var(--muted);
+  border: 1px solid var(--border);
+  object-fit: cover;
+  place-items: center;
+  width: 100%;
+  display: grid;
+}
+
+.historyOpen strong {
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  font-size: 1.02rem;
+  line-height: 1.25;
+  display: -webkit-box;
+  overflow: hidden;
+}
+
+.historyOpen small {
+  color: var(--muted-foreground);
+  margin-top: 8px;
+  font-size: .68rem;
+  line-height: 1.45;
+  display: block;
+}
+
+.historyArchive {
+  position: absolute;
+  top: 18px;
+  right: 8px;
+}
+
+.mutedText {
+  color: var(--muted-foreground);
+  margin: 0;
+  font-family: JetBrains Mono, monospace;
+}
+
+.spin {
+  animation: .9s linear infinite spin;
+}
+
+@keyframes progressMarch {
+  to {
+    background-position: 18px 0, 0 0;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 1180px) {
+  .workspace {
+    grid-template-columns: minmax(300px, 42%) 1fr;
+  }
+
+  .details, .historyList {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .appShell {
+    padding: 0 18px 34px;
+  }
+
+  .topbar, .workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .topbar {
+    align-items: start;
+    padding: 14px 0;
+  }
+
+  .systemReadout {
+    justify-content: start;
+  }
+
+  .controlPanel, .resultPanel {
+    border-right: 0;
+    padding: 20px 0;
+  }
+
+  .details, .metricGrid, .historyList {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .appShell {
+    padding: 0 14px 28px;
+  }
+
+  h1 {
+    font-size: 4.1rem;
+  }
+
+  .controlGrid, .details, .limitGrid, .metricGrid, .historyList {
+    grid-template-columns: 1fr;
+  }
+
+  .actions {
+    grid-template-columns: 1fr 1fr 44px;
+    display: grid;
+  }
+
+  .imageStage {
+    min-height: 320px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, :before, :after {
+    scroll-behavior: auto !important;
+    transition-duration: 1ms !important;
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+/*# sourceMappingURL=app_globals_0yg4wg8.css.map*/

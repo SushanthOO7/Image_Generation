@@ -200,6 +200,11 @@ export default function Home() {
     return `${job.status}${stage} - ${Math.round(job.progress * 100)}%`;
   }, [job]);
 
+  const gpuState = health === "offline" || !systemStatus?.worker ? "OFFLINE" : systemStatus.jobs_generating > 0 ? "BUSY" : "READY";
+  const jobNumber = jobId ? `JOB #${jobId.slice(0, 8).toUpperCase()}` : "NO JOB";
+  const imageDimensions = job?.width && job?.height ? `${job.width} x ${job.height}` : "PENDING";
+  const progressPercent = Math.round((job?.progress ?? 0) * 100);
+
   async function checkHealth() {
     try {
       const response = await fetch(`${apiUrl}/internal/health`);
@@ -514,453 +519,55 @@ export default function Home() {
   return (
     <main className="appShell">
       <header className="topbar">
-        <div>
-          <p className="eyebrow">FLUX.2 self-hosted platform</p>
-          <h1>Generation Console</h1>
-        </div>
-        <div className={`healthPill ${health}`}>
-          <Server size={16} />
-          <span>API {health}</span>
+        <a className="brandMark" href="#generate" aria-label="FLUX.2 generate workspace">FLUX.2</a>
+        <nav className="topnav" aria-label="Primary"><a href="#generate">GENERATE</a><a href="#history">HISTORY</a></nav>
+        <div className="systemReadout">
+          <span className={`healthPill ${health}`}><Server size={15} strokeWidth={1.5} />API / {health.toUpperCase()}</span>
+          <span>GPU / {gpuState}</span><span>{isAuthenticated ? userEmail : "SIGNED OUT"}</span>
         </div>
       </header>
-
-      <section className="workspace">
-        <form className="controlPanel" onSubmit={submitGeneration}>
-          <section className="authBox">
-            <div className="authHeader">
-              <div>
-                <p className="eyebrow">Account</p>
-                <strong>{isAuthenticated ? userEmail : "Login required"}</strong>
-              </div>
-              <UserRound size={20} />
-            </div>
-            {limits && (
-              <dl className="limitGrid">
-                <div>
-                  <dt>Active</dt>
-                  <dd>
-                    {limits.active_jobs}/{limits.concurrent_limit}
-                  </dd>
-                </div>
-                <div>
-                  <dt>Minute</dt>
-                  <dd>{limits.rate_limit_per_minute}</dd>
-                </div>
-              </dl>
-            )}
-
-            {isAuthenticated ? (
-              <button className="secondaryButton" type="button" onClick={logout}>
-                Logout
-              </button>
-            ) : (
-              <div className="authForm">
-                <div className="authMode">
-                  <button
-                    type="button"
-                    className={authMode === "login" ? "active" : ""}
-                    onClick={() => setAuthMode("login")}
-                  >
-                    Login
-                  </button>
-                  <button
-                    type="button"
-                    className={authMode === "register" ? "active" : ""}
-                    onClick={() => setAuthMode("register")}
-                  >
-                    Register
-                  </button>
-                </div>
-                <label>
-                  <span>Email</span>
-                  <input value={email} onChange={(event) => setEmail(event.target.value)} type="email" />
-                </label>
-                <label>
-                  <span>Password</span>
-                  <input value={password} onChange={(event) => setPassword(event.target.value)} type="password" />
-                </label>
-                <button className="secondaryButton" type="button" onClick={submitAuth}>
-                  {authMode === "login" ? "Login" : "Register"}
-                </button>
-              </div>
-            )}
-          </section>
-
-          <section className="monitorPanel">
-            <div className="historyHeader">
-              <div>
-                <p className="eyebrow">System Load</p>
-                <strong>API host</strong>
-              </div>
-              <Activity size={20} />
-            </div>
-            <dl className="metricGrid">
-              <div>
-                <dt>Load</dt>
-                <dd>
-                  {systemStatus
-                    ? `${systemStatus.load_1m} / ${systemStatus.cpu_count}`
-                    : "Waiting"}
-                </dd>
-              </div>
-              <div>
-                <dt>Memory</dt>
-                <dd>{systemStatus ? `${systemStatus.memory_used_percent}%` : "Waiting"}</dd>
-              </div>
-              <div>
-                <dt>Disk</dt>
-                <dd>{systemStatus ? `${systemStatus.disk_used_percent}%` : "Waiting"}</dd>
-              </div>
-              <div>
-                <dt>Uptime</dt>
-                <dd>{formatUptime(systemStatus?.uptime_seconds)}</dd>
-              </div>
-              <div>
-                <dt>Queue</dt>
-                <dd>{systemStatus ? systemStatus.jobs_queued : 0}</dd>
-              </div>
-              <div>
-                <dt>Running</dt>
-                <dd>{systemStatus ? systemStatus.jobs_generating : 0}</dd>
-              </div>
-              <div>
-                <dt>Failed</dt>
-                <dd>{systemStatus ? systemStatus.jobs_failed : 0}</dd>
-              </div>
-              <div>
-                <dt>Done</dt>
-                <dd>{systemStatus ? systemStatus.jobs_completed : 0}</dd>
-              </div>
-              <div>
-                <dt>Worker</dt>
-                <dd>{systemStatus?.worker ? "Online" : "Offline"}</dd>
-              </div>
-              <div>
-                <dt>GPU Util</dt>
-                <dd>{primaryGpu ? `${primaryGpu.utilization_gpu_percent}%` : "Waiting"}</dd>
-              </div>
-              <div>
-                <dt>GPU VRAM</dt>
-                <dd>
-                  {primaryGpu
-                    ? `${Math.round(primaryGpu.memory_used_mib / 1024)} / ${Math.round(primaryGpu.memory_total_mib / 1024)} GB`
-                    : "Waiting"}
-                </dd>
-              </div>
-              <div>
-                <dt>GPU Temp</dt>
-                <dd>{primaryGpu ? `${primaryGpu.temperature_c} C` : "Waiting"}</dd>
-              </div>
-            </dl>
-            {systemStatus?.worker?.gpus && systemStatus.worker.gpus.length > 1 && (
-              <div className="gpuList">
-                {systemStatus.worker.gpus.map((gpu) => (
-                  <span key={gpu.index}>
-                    GPU {gpu.index}: {gpu.utilization_gpu_percent}% util,{" "}
-                    {Math.round(gpu.memory_used_mib / 1024)} GB VRAM, {gpu.temperature_c} C
-                  </span>
-                ))}
-              </div>
-            )}
-          </section>
-
-          <div className="fieldGroup">
-            <label htmlFor="prompt">Prompt</label>
-            <textarea
-              id="prompt"
-              value={prompt}
-              onChange={(event) => setPrompt(event.target.value)}
-              rows={6}
-              minLength={1}
-              maxLength={4000}
-            />
-          </div>
-
-          <div className="quickPrompts">
-            {examples.map((example) => (
-              <button key={example} type="button" onClick={() => setPrompt(example)}>
-                {example}
-              </button>
-            ))}
-          </div>
-
-          <div className="controlGrid">
-            <label>
-              <span>Quality</span>
-              <select
-                value={quality}
-                onChange={(event) => {
-                  const nextQuality = event.target.value;
-                  setQuality(nextQuality);
-                  setNumOutputs(defaultCandidatesByQuality[nextQuality] ?? 1);
-                }}
-              >
-                <option value="fast">Fast</option>
-                <option value="standard">Standard</option>
-                <option value="ultra">Ultra</option>
-              </select>
-            </label>
-
-            <label>
-              <span>Style</span>
-              <select value={style} onChange={(event) => setStyle(event.target.value)}>
-                <option value="none">None</option>
-                <option value="cinematic">Cinematic</option>
-                <option value="product">Product</option>
-                <option value="editorial">Editorial</option>
-              </select>
-            </label>
-
-            <label>
-              <span>Aspect</span>
-              <select value={aspectRatio} onChange={(event) => setAspectRatio(event.target.value)}>
-                <option value="1:1">1:1</option>
-                <option value="16:9">16:9</option>
-                <option value="9:16">9:16</option>
-                <option value="4:3">4:3</option>
-              </select>
-            </label>
-
-            <label>
-              <span>Candidates</span>
-              <select value={numOutputs} onChange={(event) => setNumOutputs(Number(event.target.value))}>
-                <option value={1}>1</option>
-                <option value={2}>2</option>
-                <option value={3}>3</option>
-                <option value={4}>4</option>
-              </select>
-            </label>
-          </div>
-
-          <div className="seedControl">
-            <label>
-              <span>Seed</span>
-              <input
-                value={seed}
-                onChange={(event) => setSeed(event.target.value.replace(/\D/g, "").slice(0, 10))}
-                inputMode="numeric"
-                placeholder="Random"
-              />
-            </label>
-            <button
-              className="iconButton"
-              type="button"
-              onClick={() => setSeed(String(Math.floor(Math.random() * 2_147_483_647)))}
-              title="Randomize seed"
-            >
-              <Shuffle size={18} />
-            </button>
-          </div>
-
-          <div className="actions">
-            <button
-              className="primaryButton"
-              type="submit"
-              disabled={!isAuthenticated || isSubmitting || prompt.trim().length === 0}
-            >
-              {isSubmitting ? <Loader2 className="spin" size={18} /> : <Play size={18} />}
-              Generate
-            </button>
-            <button
-              className="stopButton"
-              type="button"
-              onClick={cancelGeneration}
-              title="Stop active generation"
-              disabled={!canCancel || isCancelling}
-            >
-              {isCancelling ? <Loader2 className="spin" size={18} /> : <XCircle size={18} />}
-              Stop
-            </button>
-            <button className="iconButton" type="button" onClick={checkHealth} title="Refresh API health">
-              <RefreshCcw size={18} />
-            </button>
-          </div>
-
-          {error && <p className="errorText">{error}</p>}
-
-          {isAuthenticated && (
-            <section className="historyPanel">
-              <div className="historyHeader">
-                <div>
-                  <p className="eyebrow">History</p>
-                  <strong>Recent generations</strong>
-                </div>
-                <button
-                  className="iconButton"
-                  type="button"
-                  onClick={() => refreshHistory()}
-                  title="Refresh generation history"
-                  disabled={isLoadingHistory}
-                >
-                  {isLoadingHistory ? <Loader2 className="spin" size={18} /> : <History size={18} />}
-                </button>
-              </div>
-
-              <div className="historyList">
-                {history.length === 0 ? (
-                  <p className="mutedText">No generations yet</p>
-                ) : (
-                  history.map((item) => {
-                    const selected = item.images.find((image) => image.selected) ?? item.images[0] ?? null;
-                    return (
-                      <div
-                        className={item.job_id === jobId ? "historyItem active" : "historyItem"}
-                        key={item.job_id}
-                      >
-                        <button className="historyOpen" type="button" onClick={() => openHistoryJob(item.job_id)}>
-                          {selected ? (
-                            <img src={selected.url} alt={item.prompt} />
-                          ) : (
-                            <span className="historyThumb">
-                              <ImageIcon size={18} />
-                            </span>
-                          )}
-                          <span>
-                            <strong>{item.prompt}</strong>
-                            <small>
-                              {item.status} - {item.width && item.height ? `${item.width} x ${item.height}` : "pending"} -{" "}
-                              {formatUtcTimestamp(item.created_at)}
-                            </small>
-                          </span>
-                        </button>
-                        <button
-                          className="historyArchive"
-                          type="button"
-                          onClick={() => archiveGeneration(item.job_id)}
-                          title="Archive generation"
-                          disabled={
-                            archivingJobId !== null ||
-                            item.status === "QUEUED" ||
-                            item.status === "GENERATING"
-                          }
-                        >
-                          {archivingJobId === item.job_id ? <Loader2 className="spin" size={16} /> : <Archive size={16} />}
-                        </button>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </section>
-          )}
-        </form>
-
-        <section className="resultPanel">
-          <div className="resultHeader">
-            <div>
-              <p className="eyebrow">Pipeline status</p>
-              <h2>{progressLabel}</h2>
-            </div>
-            <Activity size={22} />
-          </div>
-
-          <div className="progressTrack" aria-label="Generation progress">
-            <div style={{ width: `${Math.round((job?.progress ?? 0) * 100)}%` }} />
-          </div>
-
-          <div
-            className="imageStage"
-            style={{ aspectRatio: job?.width && job?.height ? `${job.width} / ${job.height}` : "1 / 1" }}
-          >
-            {imageUrl ? (
-              <img src={imageUrl} alt={job?.prompt ?? "Generated image"} />
-            ) : (
-              <div className="emptyImage">
-                <ImageIcon size={34} />
-                <span>Generated image appears here</span>
-              </div>
-            )}
-          </div>
-
-          <dl className="details">
-            <div>
-              <dt>Job</dt>
-              <dd>{jobId ?? "Not submitted"}</dd>
-            </div>
-            <div>
-              <dt>Dimensions</dt>
-              <dd>{job?.width && job?.height ? `${job.width} x ${job.height}` : "Waiting"}</dd>
-            </div>
-            <div>
-              <dt>Candidates</dt>
-              <dd>{job?.candidate_count ?? 1}</dd>
-            </div>
-            <div>
-              <dt>Seed</dt>
-              <dd>{job?.seed ?? "Random"}</dd>
-            </div>
-            <div>
-              <dt>Stage</dt>
-              <dd>{job?.status_message ?? "Waiting"}</dd>
-            </div>
-            <div>
-              <dt>Generation</dt>
-              <dd>{formatDuration(job?.generation_time_ms)}</dd>
-            </div>
-            <div>
-              <dt>Ranking</dt>
-              <dd>{formatDuration(job?.ranking_time_ms)}</dd>
-            </div>
-          </dl>
-
-          {job?.expanded_prompt && job.expanded_prompt !== job.prompt && (
-            <div className="expandedPrompt">
-              <dt>Expanded prompt</dt>
-              <dd>{job.expanded_prompt}</dd>
-            </div>
-          )}
-
-          {imageUrl && (
-            <div className="candidateGrid">
-              {job?.images.map((image, index) => (
-                <button
-                  key={image.id}
-                  className={image.selected ? "candidateTile selected" : "candidateTile"}
-                  type="button"
-                  onClick={() => selectOutput(image.id)}
-                  disabled={selectingOutputId !== null || image.selected}
-                  title={image.selected ? "Selected final image" : `Candidate ${index}`}
-                >
-                  <img src={image.url} alt={image.selected ? "Selected generated image" : `Candidate ${index}`} />
-                  <span>
-                    {selectingOutputId === image.id ? "Selecting" : image.selected ? "Selected" : `C${index}`}
-                  </span>
-                  {image.seed !== null && <small>Seed {image.seed}</small>}
-                  {image.score !== null && <small>Score {Math.round(image.score * 100)}%</small>}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {imageUrl && (
-            <div className="resultActions">
-              <a className="openImage" href={imageUrl} target="_blank" rel="noreferrer">
-                <ExternalLink size={17} />
-                Open image
-              </a>
-              <button
-                className="feedbackButton"
-                type="button"
-                onClick={() => sendFeedback(true)}
-                disabled={isSendingFeedback}
-              >
-                <ThumbsUp size={17} />
-                Like
-              </button>
-              <button
-                className="feedbackButton"
-                type="button"
-                onClick={() => sendFeedback(false)}
-                disabled={isSendingFeedback}
-              >
-                <ThumbsDown size={17} />
-                Dislike
-              </button>
-            </div>
-          )}
-          {feedbackMessage && <p className="successText">{feedbackMessage}</p>}
-        </section>
+      <section className="pageTitle" id="generate">
+        <div>
+          <p className="eyebrow">PROMPT TO GPU TO IMAGE</p>
+          <h1>GENERATE</h1>
+        </div>
+        <div className="snowHero" aria-hidden="true">
+          <span className="snowGlow" />
+          <span className="snowBeam snowBeamOne" />
+          <span className="snowBeam snowBeamTwo" />
+          <span className="snowBody snowBodyBase" />
+          <span className="snowBody snowBodyHead" />
+          <span className="snowFace snowEye snowEyeLeft" />
+          <span className="snowFace snowEye snowEyeRight" />
+          <span className="snowFace snowSmile" />
+          <span className="snowFrost frostOne" />
+          <span className="snowFrost frostTwo" />
+          <span className="snowFrost frostThree" />
+        </div>
       </section>
+      <section className="workspace" aria-label="Generation workspace">
+        <form className="controlPanel" onSubmit={submitGeneration}>
+          <section className="authBox" aria-label="Account">
+            <div className="sectionHeader"><div><p className="eyebrow">ACCOUNT</p><strong>{isAuthenticated ? userEmail : "LOGIN REQUIRED"}</strong></div><UserRound size={19} strokeWidth={1.5} /></div>
+            {limits && <dl className="limitGrid"><div><dt>ACTIVE</dt><dd>{limits.active_jobs}/{limits.concurrent_limit}</dd></div><div><dt>RATE</dt><dd>{limits.rate_limit_remaining}/{limits.rate_limit_per_minute}</dd></div></dl>}
+            {isAuthenticated ? <button className="secondaryButton" type="button" onClick={logout}>LOGOUT</button> : <div className="authForm"><div className="authMode" aria-label="Authentication mode"><button type="button" className={authMode === "login" ? "active" : ""} onClick={() => setAuthMode("login")}>LOGIN</button><button type="button" className={authMode === "register" ? "active" : ""} onClick={() => setAuthMode("register")}>REGISTER</button></div><label><span>EMAIL</span><input value={email} onChange={(event) => setEmail(event.target.value)} type="email" /></label><label><span>PASSWORD</span><input value={password} onChange={(event) => setPassword(event.target.value)} type="password" /></label><button className="secondaryButton" type="button" onClick={submitAuth}>{authMode === "login" ? "LOGIN" : "REGISTER"}</button></div>}
+          </section>
+          <div className="fieldGroup promptComposer"><div className="sectionHeader"><label htmlFor="prompt">PROMPT</label><span>{prompt.length} / 4000</span></div><textarea id="prompt" value={prompt} onChange={(event) => setPrompt(event.target.value)} rows={8} minLength={1} maxLength={4000} /></div>
+          <div className="quickPrompts" aria-label="Prompt examples">{examples.map((example) => <button key={example} type="button" onClick={() => setPrompt(example)}>{example}</button>)}</div>
+          <div className="controlGrid">
+            <label><span>QUALITY</span><select value={quality} onChange={(event) => { const nextQuality = event.target.value; setQuality(nextQuality); setNumOutputs(defaultCandidatesByQuality[nextQuality] ?? 1); }}><option value="fast">Fast</option><option value="standard">Standard</option><option value="ultra">Ultra</option></select></label>
+            <label><span>STYLE</span><select value={style} onChange={(event) => setStyle(event.target.value)}><option value="none">None</option><option value="cinematic">Cinematic</option><option value="product">Product</option><option value="editorial">Editorial</option></select></label>
+            <label><span>ASPECT</span><select value={aspectRatio} onChange={(event) => setAspectRatio(event.target.value)}><option value="1:1">1:1</option><option value="16:9">16:9</option><option value="9:16">9:16</option><option value="4:3">4:3</option></select></label>
+            <label><span>OUTPUTS</span><select value={numOutputs} onChange={(event) => setNumOutputs(Number(event.target.value))}><option value={1}>1</option><option value={2}>2</option><option value={3}>3</option><option value={4}>4</option></select></label>
+          </div>
+          <div className="seedControl"><label><span>SEED</span><input value={seed} onChange={(event) => setSeed(event.target.value.replace(/\D/g, "").slice(0, 10))} inputMode="numeric" placeholder="Random" /></label><button className="iconButton" type="button" onClick={() => setSeed(String(Math.floor(Math.random() * 2_147_483_647)))} title="Randomize seed"><Shuffle size={18} strokeWidth={1.5} /></button></div>
+          <div className="actions"><button className="primaryButton" type="submit" disabled={!isAuthenticated || isSubmitting || prompt.trim().length === 0}>{isSubmitting ? <Loader2 className="spin" size={18} strokeWidth={1.5} /> : <Play size={18} strokeWidth={1.5} />}GENERATE</button><button className="stopButton" type="button" onClick={cancelGeneration} title="Stop active generation" disabled={!canCancel || isCancelling}>{isCancelling ? <Loader2 className="spin" size={18} strokeWidth={1.5} /> : <XCircle size={18} strokeWidth={1.5} />}STOP</button><button className="iconButton" type="button" onClick={checkHealth} title="Refresh API health"><RefreshCcw size={18} strokeWidth={1.5} /></button></div>
+          {error && <p className="notice errorText" role="status">{error}</p>}
+          <section className="monitorPanel" aria-label="System"><div className="sectionHeader"><div><p className="eyebrow">SYSTEM</p><strong>GPU / {gpuState}</strong></div><Activity size={19} strokeWidth={1.5} /></div><dl className="metricGrid"><div><dt>QUEUE</dt><dd>{systemStatus ? systemStatus.jobs_queued : 0}</dd></div><div><dt>ACTIVE</dt><dd>{systemStatus ? systemStatus.jobs_generating : 0}</dd></div><div><dt>GPU</dt><dd>{primaryGpu ? `${primaryGpu.utilization_gpu_percent}%` : "WAITING"}</dd></div><div><dt>VRAM</dt><dd>{primaryGpu ? `${Math.round(primaryGpu.memory_used_mib / 1024)} / ${Math.round(primaryGpu.memory_total_mib / 1024)} GB` : "WAITING"}</dd></div><div><dt>UPTIME</dt><dd>{formatUptime(systemStatus?.uptime_seconds).toUpperCase()}</dd></div><div><dt>DONE</dt><dd>{systemStatus ? systemStatus.jobs_completed : 0}</dd></div></dl></section>
+        </form>
+        <section className={`resultPanel ${job?.status?.toLowerCase() ?? "idle"}`} aria-label="Generation result"><div className="resultHeader"><div><p className="eyebrow">PIPELINE STATUS</p><h2>{job ? job.status : "READY TO GENERATE."}</h2></div><span>{progressLabel}</span></div><div className="progressTrack" aria-label="Generation progress"><div style={{ width: `${progressPercent}%` }} /></div><div className="imageStage" style={{ aspectRatio: job?.width && job?.height ? `${job.width} / ${job.height}` : "1 / 1" }}>{imageUrl ? <img src={imageUrl} alt={job?.prompt ?? "Generated image"} /> : <div className="emptyImage"><span>{job?.status === "FAILED" ? "GENERATION FAILED" : job?.status === "CANCELLED" ? "JOB CANCELLED" : job ? job.status : "YOUR IMAGE WILL APPEAR HERE."}</span><small>{job?.error_message ?? job?.status_message ?? jobNumber}</small></div>}</div><dl className="details"><div><dt>JOB</dt><dd>{jobNumber}</dd></div><div><dt>MODEL</dt><dd>FLUX.2</dd></div><div><dt>SIZE</dt><dd>{imageDimensions}</dd></div><div><dt>SEED</dt><dd>{job?.seed ?? "RANDOM"}</dd></div><div><dt>OUTPUTS</dt><dd>{job?.candidate_count ?? numOutputs}</dd></div><div><dt>TIME</dt><dd>{formatDuration(job?.generation_time_ms).toUpperCase()}</dd></div></dl>{job?.expanded_prompt && job.expanded_prompt !== job.prompt && <div className="expandedPrompt"><dt>EXPANDED PROMPT</dt><dd>{job.expanded_prompt}</dd></div>}{imageUrl && <div className="candidateGrid" aria-label="Generated candidates">{job?.images.map((image, index) => <button key={image.id} className={image.selected ? "candidateTile selected" : "candidateTile"} type="button" onClick={() => selectOutput(image.id)} disabled={selectingOutputId !== null || image.selected} title={image.selected ? "Selected final image" : `Candidate ${index + 1}`}><img src={image.url} alt={image.selected ? "Selected generated image" : `Candidate ${index + 1}`} /><span>{selectingOutputId === image.id ? "SELECTING" : image.selected ? "SELECTED" : `C${index + 1}`}</span>{image.seed !== null && <small>SEED {image.seed}</small>}{image.score !== null && <small>SCORE {Math.round(image.score * 100)}%</small>}</button>)}</div>}{imageUrl && <div className="resultActions" aria-label="Result actions"><a className="openImage" href={imageUrl} target="_blank" rel="noreferrer"><ExternalLink size={17} strokeWidth={1.5} />OPEN IMAGE</a><button className="feedbackButton" type="button" onClick={() => sendFeedback(true)} disabled={isSendingFeedback}><ThumbsUp size={17} strokeWidth={1.5} />YES</button><button className="feedbackButton" type="button" onClick={() => sendFeedback(false)} disabled={isSendingFeedback}><ThumbsDown size={17} strokeWidth={1.5} />NO</button></div>}{feedbackMessage && <p className="notice successText" role="status">{feedbackMessage}</p>}</section>
+      </section>
+      {isAuthenticated && <section className="historyPanel" id="history"><div className="historyHeader"><div><p className="eyebrow">ARCHIVE</p><h2>HISTORY</h2></div><button className="iconButton" type="button" onClick={() => refreshHistory()} title="Refresh generation history" disabled={isLoadingHistory}>{isLoadingHistory ? <Loader2 className="spin" size={18} strokeWidth={1.5} /> : <History size={18} strokeWidth={1.5} />}</button></div><div className="historyList">{history.length === 0 ? <p className="mutedText">NO GENERATIONS YET</p> : history.map((item) => { const selected = item.images.find((image) => image.selected) ?? item.images[0] ?? null; return <article className={item.job_id === jobId ? "historyItem active" : "historyItem"} key={item.job_id}><button className="historyOpen" type="button" onClick={() => openHistoryJob(item.job_id)}>{selected ? <img src={selected.url} alt={item.prompt} /> : <span className="historyThumb"><ImageIcon size={20} strokeWidth={1.5} /></span>}<span><strong>{item.prompt}</strong><small>JOB #{item.job_id.slice(0, 8).toUpperCase()} / {item.status} / {item.width && item.height ? `${item.width} x ${item.height}` : "PENDING"} / {formatUtcTimestamp(item.created_at)}</small></span></button><button className="historyArchive" type="button" onClick={() => archiveGeneration(item.job_id)} title="Archive generation" disabled={archivingJobId !== null || item.status === "QUEUED" || item.status === "GENERATING"}>{archivingJobId === item.job_id ? <Loader2 className="spin" size={16} strokeWidth={1.5} /> : <Archive size={16} strokeWidth={1.5} />}</button></article>; })}</div></section>}
     </main>
   );
 }

@@ -43,7 +43,7 @@ class FluxModelManager:
         local_model_path = Path(self.settings.model_root) / model_id.replace("/", "--")
         model_path = str(local_model_path) if local_model_path.exists() else model_id
         device_map = self.config.get("device_map")
-        max_memory = self._max_memory_config()
+        max_memory = self._max_memory_config(torch.cuda.device_count())
 
         load_kwargs: dict[str, Any] = {
             "dtype": torch_dtype,
@@ -68,9 +68,9 @@ class FluxModelManager:
             self.pipeline.to(str(self.config.get("device", "cuda")))
         return self.pipeline
 
-    def _max_memory_config(self) -> dict[int, str]:
+    def _max_memory_config(self, visible_gpu_count: int) -> dict[int, str]:
         max_memory: dict[int, str] = {}
-        for index in range(8):
+        for index in range(visible_gpu_count):
             value = self.config.get(f"max_memory_gpu_{index}")
             if value:
                 max_memory[index] = str(value)
