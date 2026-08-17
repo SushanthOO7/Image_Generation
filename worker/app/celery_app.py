@@ -8,7 +8,7 @@ celery_app = Celery(
     settings.worker_name,
     broker=settings.redis_url,
     backend=settings.redis_url,
-    include=["worker.app.tasks"],
+    include=["worker.app.lifecycle", "worker.app.tasks"],
 )
 
 celery_app.conf.task_default_queue = "generation:normal"

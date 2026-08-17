@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+from secrets import randbelow
 from uuid import uuid4
 
 from sqlalchemy import func, select
@@ -53,7 +54,8 @@ def create_generation_job(
         height=plan.height,
         steps=plan.steps,
         guidance=plan.guidance,
-        candidate_count=plan.candidate_count,
+        seed=request.seed if request.seed is not None else randbelow(2_147_483_647),
+        candidate_count=min(request.num_outputs, plan.candidate_count),
         status=GenerationStatus.queued.value,
         status_message="Queued",
         progress=0.05,
@@ -152,6 +154,7 @@ def complete_generation_with_outputs(
     job: GenerationJob,
     outputs: list[dict[str, object]],
     generation_time_ms: int | None = None,
+    ranking_time_ms: int | None = None,
 ) -> GenerationJob:
     if job.status == GenerationStatus.cancelled.value:
         return job
@@ -161,6 +164,7 @@ def complete_generation_with_outputs(
     job.progress = 1.0
     job.completed_at = datetime.now(UTC)
     job.generation_time_ms = generation_time_ms
+    job.ranking_time_ms = ranking_time_ms
     if not job.outputs:
         selected_index = max(
             range(len(outputs)),
@@ -237,6 +241,7 @@ def mark_generation_failed(
     job: GenerationJob,
     error_code: str,
     error_message: str,
+    generation_time_ms: int | None = None,
 ) -> GenerationJob:
     job.status = GenerationStatus.failed.value
     job.status_message = "Failed"
@@ -244,6 +249,7 @@ def mark_generation_failed(
     job.completed_at = datetime.now(UTC)
     job.error_code = error_code
     job.error_message = error_message
+    job.generation_time_ms = generation_time_ms
     db.commit()
     db.refresh(job)
     return job

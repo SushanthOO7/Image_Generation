@@ -11,6 +11,7 @@ from worker.app.settings import WorkerSettings
 class ObjectStorage:
     def __init__(self, settings: WorkerSettings) -> None:
         self.settings = settings
+        self._bucket_ready = False
         self.client: BaseClient = boto3.client(
             "s3",
             endpoint_url=settings.minio_endpoint,
@@ -19,6 +20,8 @@ class ObjectStorage:
         )
 
     def ensure_bucket(self) -> None:
+        if self._bucket_ready:
+            return
         try:
             self.client.head_bucket(Bucket=self.settings.minio_bucket)
         except ClientError:
@@ -39,9 +42,9 @@ class ObjectStorage:
                 }
             ),
         )
+        self._bucket_ready = True
 
     def upload_webp(self, key: str, image_bytes: bytes) -> str:
-        self.ensure_bucket()
         self.client.put_object(
             Bucket=self.settings.minio_bucket,
             Key=key,

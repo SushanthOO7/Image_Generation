@@ -83,6 +83,7 @@ def generation_response(job) -> GenerationStatusResponse:
                 url=public_image_url(output.storage_path),
                 selected=output.selected,
                 score=output.final_score,
+                seed=output.seed,
             )
         )
 
@@ -96,6 +97,7 @@ def generation_response(job) -> GenerationStatusResponse:
         width=job.width,
         height=job.height,
         candidate_count=job.candidate_count,
+        seed=job.seed,
         images=images,
         error_code=job.error_code,
         error_message=job.error_message,

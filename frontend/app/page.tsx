@@ -9,6 +9,7 @@ import {
   ImageIcon,
   Loader2,
   Play,
+  Shuffle,
   RefreshCcw,
   Server,
   ThumbsDown,
@@ -24,6 +25,7 @@ type GenerationImage = {
   url: string;
   selected: boolean;
   score: number | null;
+  seed: number | null;
 };
 
 type GenerationResponse = {
@@ -36,6 +38,7 @@ type GenerationResponse = {
   width: number | null;
   height: number | null;
   candidate_count: number;
+  seed: number | null;
   images: GenerationImage[];
   error_code: string | null;
   error_message: string | null;
@@ -76,6 +79,12 @@ const examples = [
   "A velvet armchair floating above a neon canyon",
 ];
 
+const defaultCandidatesByQuality: Record<string, number> = {
+  fast: 1,
+  standard: 2,
+  ultra: 4,
+};
+
 function formatUtcTimestamp(value: string) {
   return value.replace("T", " ").replace(/\.\d+Z$/, " UTC").replace("Z", " UTC");
 }
@@ -103,8 +112,10 @@ async function apiErrorMessage(response: Response, fallback: string) {
 export default function Home() {
   const [prompt, setPrompt] = useState(examples[0]);
   const [quality, setQuality] = useState("fast");
+  const [numOutputs, setNumOutputs] = useState(1);
   const [style, setStyle] = useState("none");
   const [aspectRatio, setAspectRatio] = useState("1:1");
+  const [seed, setSeed] = useState("");
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("demo@example.com");
   const [password, setPassword] = useState("password123");
@@ -292,7 +303,8 @@ export default function Home() {
           aspect_ratio: aspectRatio,
           quality,
           style,
-          num_outputs: 1,
+          num_outputs: numOutputs,
+          seed: seed.trim() === "" ? null : Number(seed),
         }),
       });
 
@@ -311,7 +323,8 @@ export default function Home() {
         expanded_prompt: null,
         width: null,
         height: null,
-        candidate_count: 1,
+        candidate_count: numOutputs,
+        seed: seed.trim() === "" ? null : Number(seed),
         images: [],
         error_code: null,
         error_message: null,
@@ -522,7 +535,14 @@ export default function Home() {
           <div className="controlGrid">
             <label>
               <span>Quality</span>
-              <select value={quality} onChange={(event) => setQuality(event.target.value)}>
+              <select
+                value={quality}
+                onChange={(event) => {
+                  const nextQuality = event.target.value;
+                  setQuality(nextQuality);
+                  setNumOutputs(defaultCandidatesByQuality[nextQuality] ?? 1);
+                }}
+              >
                 <option value="fast">Fast</option>
                 <option value="standard">Standard</option>
                 <option value="ultra">Ultra</option>
@@ -548,6 +568,36 @@ export default function Home() {
                 <option value="4:3">4:3</option>
               </select>
             </label>
+
+            <label>
+              <span>Candidates</span>
+              <select value={numOutputs} onChange={(event) => setNumOutputs(Number(event.target.value))}>
+                <option value={1}>1</option>
+                <option value={2}>2</option>
+                <option value={3}>3</option>
+                <option value={4}>4</option>
+              </select>
+            </label>
+          </div>
+
+          <div className="seedControl">
+            <label>
+              <span>Seed</span>
+              <input
+                value={seed}
+                onChange={(event) => setSeed(event.target.value.replace(/\D/g, "").slice(0, 10))}
+                inputMode="numeric"
+                placeholder="Random"
+              />
+            </label>
+            <button
+              className="iconButton"
+              type="button"
+              onClick={() => setSeed(String(Math.floor(Math.random() * 2_147_483_647)))}
+              title="Randomize seed"
+            >
+              <Shuffle size={18} />
+            </button>
           </div>
 
           <div className="actions">
@@ -684,6 +734,10 @@ export default function Home() {
               <dd>{job?.candidate_count ?? 1}</dd>
             </div>
             <div>
+              <dt>Seed</dt>
+              <dd>{job?.seed ?? "Random"}</dd>
+            </div>
+            <div>
               <dt>Stage</dt>
               <dd>{job?.status_message ?? "Waiting"}</dd>
             </div>
@@ -711,6 +765,8 @@ export default function Home() {
                   <span>
                     {selectingOutputId === image.id ? "Selecting" : image.selected ? "Selected" : `C${index}`}
                   </span>
+                  {image.seed !== null && <small>Seed {image.seed}</small>}
+                  {image.score !== null && <small>Score {Math.round(image.score * 100)}%</small>}
                 </button>
               ))}
             </div>

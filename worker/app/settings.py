@@ -12,6 +12,7 @@ class WorkerSettings:
     generation_backend: str = "mock"
     default_model_version: str = "flux2-dev-bf16-v1"
     flux_config_path: str = "/app/model_configs/flux2.yaml"
+    preload_model_on_startup: bool = False
     minio_endpoint: str = "http://minio:9000"
     minio_public_endpoint: str = "http://localhost:9000"
     minio_root_user: str = "flux_minio"
@@ -26,6 +27,7 @@ def load_worker_settings() -> WorkerSettings:
         generation_backend=os.getenv("GENERATION_BACKEND", "mock"),
         default_model_version=os.getenv("DEFAULT_MODEL_VERSION", "flux2-dev-bf16-v1"),
         flux_config_path=os.getenv("FLUX_CONFIG_PATH", "/app/model_configs/flux2.yaml"),
+        preload_model_on_startup=os.getenv("PRELOAD_MODEL_ON_STARTUP", "false").lower() == "true",
         minio_endpoint=os.getenv("MINIO_ENDPOINT", "http://minio:9000"),
         minio_public_endpoint=os.getenv("MINIO_PUBLIC_ENDPOINT", "http://localhost:9000"),
         minio_root_user=os.getenv("MINIO_ROOT_USER", "flux_minio"),

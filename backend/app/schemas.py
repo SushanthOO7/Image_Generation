@@ -49,6 +49,7 @@ class GenerationRequest(BaseModel):
     quality: Literal["fast", "standard", "ultra"] = "fast"
     style: Literal["none", "cinematic", "product", "editorial"] = "none"
     num_outputs: int = Field(default=1, ge=1, le=4)
+    seed: int | None = Field(default=None, ge=0, le=2_147_483_646)
 
 
 class GenerationSubmitResponse(BaseModel):
@@ -61,6 +62,7 @@ class GenerationImage(BaseModel):
     url: str
     selected: bool = False
     score: float | None = None
+    seed: int | None = None
 
 
 class GenerationStatusResponse(BaseModel):
@@ -73,6 +75,7 @@ class GenerationStatusResponse(BaseModel):
     width: int | None = None
     height: int | None = None
     candidate_count: int = 1
+    seed: int | None = None
     images: list[GenerationImage] = Field(default_factory=list)
     error_code: str | None = None
     error_message: str | None = None

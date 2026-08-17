@@ -239,10 +239,22 @@ select:focus {
 .controlGrid {
   display: grid;
   gap: 10px;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .controlGrid label {
+  display: grid;
+  gap: 7px;
+}
+
+.seedControl {
+  align-items: end;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 1fr 44px;
+}
+
+.seedControl label {
   display: grid;
   gap: 7px;
 }
@@ -484,7 +496,7 @@ select:focus {
 .details {
   display: grid;
   gap: 10px;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   margin: 0;
 }
 
@@ -542,6 +554,11 @@ select:focus {
   font-size: 0.82rem;
   font-weight: 750;
   text-align: center;
+}
+
+.candidateTile small {
+  color: #a7aaa3;
+  font-size: 0.72rem;
 }
 
 dt {

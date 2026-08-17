@@ -184,7 +184,7 @@ Download the model:
 python scripts/download_flux2.py
 ```
 
-Start the worker:
+Start the worker in the foreground:
 
 ```bash
 celery -A worker.app.celery_app worker --loglevel=info -Q generation:high,generation:normal,generation:low -c 1
@@ -192,21 +192,42 @@ celery -A worker.app.celery_app worker --loglevel=info -Q generation:high,genera
 
 Keep this terminal open. When you click Generate in the UI, this worker should log that it received `worker.generate_image`.
 
-For a longer-running session on a loaner server, use `tmux` if available:
+For a longer-running session on a loaner server, use the helper scripts. They run the worker in a `tmux` session named `flux-worker`:
 
 ```bash
-tmux new -s flux-worker
-source .venv/bin/activate
-set -a
-source .env.gpu-worker
-set +a
-celery -A worker.app.celery_app worker --loglevel=info -Q generation:high,generation:normal,generation:low -c 1
+./scripts/gpu_worker_start.sh
 ```
 
-Detach from tmux with `Ctrl+b`, then `d`. Reattach with:
+Check it:
+
+```bash
+./scripts/gpu_worker_status.sh
+```
+
+Check the worker through Redis/Celery:
+
+```bash
+./scripts/gpu_worker_health.sh
+```
+
+Attach to logs:
 
 ```bash
 tmux attach -t flux-worker
+```
+
+Detach from tmux with `Ctrl+b`, then `d`.
+
+Stop it:
+
+```bash
+./scripts/gpu_worker_stop.sh
+```
+
+You can pass a non-default env file to the start script:
+
+```bash
+./scripts/gpu_worker_start.sh /path/to/.env.gpu-worker
 ```
 
 ## 6. Docker GPU Worker Path
@@ -238,12 +259,15 @@ MODEL_ROOT=/models
 GENERATION_BACKEND=flux
 DEFAULT_MODEL_VERSION=flux2-dev-bf16-v1
 FLUX_CONFIG_PATH=/app/model_configs/flux2.yaml
+PRELOAD_MODEL_ON_STARTUP=true
 
 HF_TOKEN=hf_your_token_here
 FLUX_MODEL_ID=black-forest-labs/FLUX.2-dev
 ```
 
 Replace `MAIN_SERVER_IP` with the server running `postgres`, `redis`, and `minio`.
+
+`PRELOAD_MODEL_ON_STARTUP=true` makes the worker load FLUX when Celery starts, before the first user request. Startup takes longer, but the first generation avoids cold model loading.
 
 ### Download The Model
 

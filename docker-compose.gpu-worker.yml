@@ -5,7 +5,7 @@ services:
       dockerfile: worker/Dockerfile.gpu
     working_dir: /app
     command: >
-      python3.12 -m celery
+      celery
       -A worker.app.celery_app
       worker
       --loglevel=info
