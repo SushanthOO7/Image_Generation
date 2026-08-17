@@ -18,3 +18,12 @@ def enqueue_generation(job_id: str) -> str:
 
 def terminate_generation_task(task_id: str) -> None:
     celery_app.control.revoke(task_id, terminate=True, signal="SIGKILL")
+
+
+def get_worker_health(timeout_seconds: float) -> dict[str, object] | None:
+    result = celery_app.send_task("worker.health", queue="generation:normal")
+    try:
+        health = result.get(timeout=timeout_seconds)
+    except Exception:
+        return None
+    return health if isinstance(health, dict) else None

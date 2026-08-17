@@ -77,6 +77,9 @@ class GenerationStatusResponse(BaseModel):
     candidate_count: int = 1
     seed: int | None = None
     images: list[GenerationImage] = Field(default_factory=list)
+    generation_time_ms: int | None = None
+    ranking_time_ms: int | None = None
+    upscale_time_ms: int | None = None
     error_code: str | None = None
     error_message: str | None = None
 

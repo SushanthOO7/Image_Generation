@@ -260,6 +260,8 @@ GENERATION_BACKEND=flux
 DEFAULT_MODEL_VERSION=flux2-dev-bf16-v1
 FLUX_CONFIG_PATH=/app/model_configs/flux2.yaml
 PRELOAD_MODEL_ON_STARTUP=true
+RANKER_BACKEND=heuristic
+CLIP_RANKER_MODEL_ID=openai/clip-vit-base-patch32
 
 HF_TOKEN=hf_your_token_here
 FLUX_MODEL_ID=black-forest-labs/FLUX.2-dev
@@ -268,6 +270,15 @@ FLUX_MODEL_ID=black-forest-labs/FLUX.2-dev
 Replace `MAIN_SERVER_IP` with the server running `postgres`, `redis`, and `minio`.
 
 `PRELOAD_MODEL_ON_STARTUP=true` makes the worker load FLUX when Celery starts, before the first user request. Startup takes longer, but the first generation avoids cold model loading.
+
+`RANKER_BACKEND=heuristic` uses the built-in lightweight ranker. To try CLIP-based prompt/image alignment scoring, set:
+
+```text
+RANKER_BACKEND=clip
+CLIP_RANKER_MODEL_ID=openai/clip-vit-base-patch32
+```
+
+The CLIP ranker loads an additional model in the worker process, so test it after FLUX generation is stable.
 
 ### Download The Model
 

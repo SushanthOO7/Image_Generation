@@ -1,4 +1,7 @@
 import time
+import os
+import shutil
+import subprocess
 from typing import Any
 
 from backend.app.database import SessionLocal
@@ -14,7 +17,7 @@ from worker.app.celery_app import celery_app
 from worker.app.generation import build_image_generator
 from worker.app.image_renderer import render_thumbnail
 from worker.app.lifecycle import get_preloaded_generator
-from worker.app.ranker import HeuristicRanker
+from worker.app.ranker import build_ranker
 from worker.app.settings import load_worker_settings
 from worker.app.storage import ObjectStorage, generation_object_key
 
@@ -57,7 +60,7 @@ def generate_image(job_id: str) -> dict[str, str]:
         settings = load_worker_settings()
         storage = ObjectStorage(settings)
         storage.ensure_bucket()
-        ranker = HeuristicRanker()
+        ranker = build_ranker(settings)
         job = update_generation_progress(db, job, 0.15, "Loading model")
         generator = get_cached_generator(settings)
         job = get_generation_job(db, job_id)
@@ -79,7 +82,7 @@ def generate_image(job_id: str) -> dict[str, str]:
                 f"Generating candidate {candidate_index} of {candidate_count}",
             )
             generated = generator.generate(job, candidate_index=candidate_index)
-            score = ranker.score(generated, candidate_index, candidate_count)
+            score = ranker.score(job, generated, candidate_index, candidate_count)
             job = get_generation_job(db, job_id)
             if job is None:
                 return {"job_id": job_id, "status": "NOT_FOUND"}
@@ -166,4 +169,49 @@ def worker_health() -> dict[str, object]:
         "flux_config_path": settings.flux_config_path,
         "preloaded": get_preloaded_generator() is not None,
         "model": model_health,
+        "system": _worker_system_snapshot(),
+        "gpus": _gpu_snapshot(),
     }
+
+
+def _worker_system_snapshot() -> dict[str, object]:
+    load_1m, load_5m, load_15m = os.getloadavg()
+    disk = shutil.disk_usage("/")
+    return {
+        "load_1m": round(load_1m, 3),
+        "load_5m": round(load_5m, 3),
+        "load_15m": round(load_15m, 3),
+        "cpu_count": os.cpu_count() or 1,
+        "disk_used_percent": round((1 - disk.free / disk.total) * 100, 2),
+    }
+
+
+def _gpu_snapshot() -> list[dict[str, object]]:
+    try:
+        output = subprocess.check_output(
+            [
+                "nvidia-smi",
+                "--query-gpu=index,name,utilization.gpu,memory.used,memory.total,temperature.gpu,power.draw",
+                "--format=csv,noheader,nounits",
+            ],
+            text=True,
+            timeout=5,
+        )
+    except (FileNotFoundError, subprocess.SubprocessError):
+        return []
+
+    gpus: list[dict[str, object]] = []
+    for line in output.strip().splitlines():
+        index, name, util, mem_used, mem_total, temp, power = [part.strip() for part in line.split(",")]
+        gpus.append(
+            {
+                "index": int(index),
+                "name": name,
+                "utilization_gpu_percent": float(util),
+                "memory_used_mib": float(mem_used),
+                "memory_total_mib": float(mem_total),
+                "temperature_c": float(temp),
+                "power_draw_w": float(power) if power != "[Not Supported]" else None,
+            }
+        )
+    return gpus

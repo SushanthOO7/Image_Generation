@@ -335,6 +335,41 @@ select:focus {
   padding: 14px;
 }
 
+.monitorPanel {
+  border: 1px solid rgba(244, 240, 232, 0.12);
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.metricGrid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0;
+}
+
+.metricGrid div {
+  background: #151b1e;
+  border: 1px solid rgba(244, 240, 232, 0.1);
+  border-radius: 8px;
+  min-width: 0;
+  padding: 10px;
+}
+
+.metricGrid dd {
+  font-size: 0.88rem;
+}
+
+.gpuList {
+  color: #a7aaa3;
+  display: grid;
+  font-size: 0.78rem;
+  gap: 6px;
+  line-height: 1.35;
+}
+
 .historyHeader {
   align-items: center;
   display: flex;
@@ -625,7 +660,8 @@ dd {
   }
 
   .controlGrid,
-  .details {
+  .details,
+  .metricGrid {
     grid-template-columns: 1fr;
   }
 }

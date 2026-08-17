@@ -1,4 +1,4 @@
-from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi import Depends, FastAPI, HTTPException, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from kombu.exceptions import KombuError
 from sqlalchemy.orm import Session
@@ -6,7 +6,8 @@ from sqlalchemy.orm import Session
 from backend.app.auth import create_access_token, get_current_user, hash_password, verify_password
 from backend.app.database import get_db
 from backend.app.models import User
-from backend.app.queue import enqueue_generation, terminate_generation_task
+from backend.app.monitoring import collect_system_snapshot, prometheus_metrics
+from backend.app.queue import enqueue_generation, get_worker_health, terminate_generation_task
 from backend.app.rate_limits import check_generation_rate_limit
 from backend.app.repositories import (
     archive_generation_job,
@@ -21,6 +22,7 @@ from backend.app.repositories import (
     set_generation_task_id,
 )
 from backend.app.repositories import cancel_generation_job, create_generation_feedback
+from backend.app.safety import check_prompt_safety
 from backend.app.schemas import (
     ArchiveGenerationResponse,
     AuthRequest,
@@ -69,6 +71,21 @@ def health() -> dict[str, str]:
     return {"status": "up and running", "service": settings.app_name}
 
 
+@app.get("/internal/system")
+def system_status(db: Session = Depends(get_db)) -> dict[str, object]:
+    worker_health = get_worker_health(settings.worker_health_timeout_seconds)
+    return collect_system_snapshot(db, worker_health=worker_health).__dict__
+
+
+@app.get("/metrics")
+def metrics(db: Session = Depends(get_db)) -> Response:
+    worker_health = get_worker_health(settings.worker_health_timeout_seconds)
+    return Response(
+        content=prometheus_metrics(collect_system_snapshot(db, worker_health=worker_health)),
+        media_type="text/plain; version=0.0.4; charset=utf-8",
+    )
+
+
 def user_response(user: User) -> UserResponse:
     return UserResponse(id=user.id, email=user.email or "", role=user.role)
 
@@ -99,6 +116,9 @@ def generation_response(job) -> GenerationStatusResponse:
         candidate_count=job.candidate_count,
         seed=job.seed,
         images=images,
+        generation_time_ms=job.generation_time_ms,
+        ranking_time_ms=job.ranking_time_ms,
+        upscale_time_ms=job.upscale_time_ms,
         error_code=job.error_code,
         error_message=job.error_message,
     )
@@ -159,6 +179,10 @@ def submit_generation(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> GenerationSubmitResponse:
+    safety_result = check_prompt_safety(request.prompt, settings.safety_config_path)
+    if not safety_result.allowed:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=safety_result.reason or "Prompt blocked")
+
     active_jobs = count_active_generation_jobs(db, current_user.id)
     if active_jobs >= settings.concurrent_generation_limit:
         raise HTTPException(

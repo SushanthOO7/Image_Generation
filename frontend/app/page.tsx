@@ -40,6 +40,9 @@ type GenerationResponse = {
   candidate_count: number;
   seed: number | null;
   images: GenerationImage[];
+  generation_time_ms: number | null;
+  ranking_time_ms: number | null;
+  upscale_time_ms: number | null;
   error_code: string | null;
   error_message: string | null;
 };
@@ -71,6 +74,39 @@ type LimitsResponse = {
   active_jobs: number;
 };
 
+type SystemStatus = {
+  uptime_seconds: number;
+  load_1m: number;
+  load_5m: number;
+  load_15m: number;
+  cpu_count: number;
+  memory_used_percent: number;
+  disk_used_percent: number;
+  jobs_queued: number;
+  jobs_generating: number;
+  jobs_completed: number;
+  jobs_failed: number;
+  jobs_cancelled: number;
+  worker: WorkerStatus | null;
+};
+
+type WorkerStatus = {
+  status: string;
+  backend: string;
+  preloaded: boolean;
+  gpus: GpuStatus[];
+};
+
+type GpuStatus = {
+  index: number;
+  name: string;
+  utilization_gpu_percent: number;
+  memory_used_mib: number;
+  memory_total_mib: number;
+  temperature_c: number;
+  power_draw_w: number | null;
+};
+
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 const examples = [
@@ -87,6 +123,20 @@ const defaultCandidatesByQuality: Record<string, number> = {
 
 function formatUtcTimestamp(value: string) {
   return value.replace("T", " ").replace(/\.\d+Z$/, " UTC").replace("Z", " UTC");
+}
+
+function formatDuration(ms: number | null | undefined) {
+  if (ms === null || ms === undefined) return "Waiting";
+  if (ms < 1000) return `${ms} ms`;
+  return `${(ms / 1000).toFixed(1)} s`;
+}
+
+function formatUptime(seconds: number | null | undefined) {
+  if (!seconds) return "0m";
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  if (hours > 0) return `${hours}h ${minutes % 60}m`;
+  return `${minutes}m`;
 }
 
 async function apiErrorMessage(response: Response, fallback: string) {
@@ -126,6 +176,7 @@ export default function Home() {
   const [jobId, setJobId] = useState<string | null>(null);
   const [job, setJob] = useState<GenerationResponse | null>(null);
   const [health, setHealth] = useState<"checking" | "online" | "offline">("checking");
+  const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
   const [archivingJobId, setArchivingJobId] = useState<string | null>(null);
@@ -141,6 +192,7 @@ export default function Home() {
   const canPoll = jobId !== null && !isTerminal;
   const canCancel = jobId !== null && job !== null && !isTerminal;
   const isAuthenticated = accessToken !== null;
+  const primaryGpu = systemStatus?.worker?.gpus?.[0] ?? null;
 
   const progressLabel = useMemo(() => {
     if (!job) return "Waiting";
@@ -154,6 +206,17 @@ export default function Home() {
       setHealth(response.ok ? "online" : "offline");
     } catch {
       setHealth("offline");
+    }
+  }
+
+  async function refreshSystemStatus() {
+    try {
+      const response = await fetch(`${apiUrl}/internal/system`);
+      if (response.ok) {
+        setSystemStatus((await response.json()) as SystemStatus);
+      }
+    } catch {
+      setSystemStatus(null);
     }
   }
 
@@ -326,6 +389,9 @@ export default function Home() {
         candidate_count: numOutputs,
         seed: seed.trim() === "" ? null : Number(seed),
         images: [],
+        generation_time_ms: null,
+        ranking_time_ms: null,
+        upscale_time_ms: null,
         error_code: null,
         error_message: null,
       });
@@ -422,6 +488,14 @@ export default function Home() {
       refreshHistory(storedToken).catch(() => undefined);
     }
     checkHealth();
+    refreshSystemStatus().catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      refreshSystemStatus().catch(() => undefined);
+    }, 5000);
+    return () => window.clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -508,6 +582,84 @@ export default function Home() {
                 <button className="secondaryButton" type="button" onClick={submitAuth}>
                   {authMode === "login" ? "Login" : "Register"}
                 </button>
+              </div>
+            )}
+          </section>
+
+          <section className="monitorPanel">
+            <div className="historyHeader">
+              <div>
+                <p className="eyebrow">System Load</p>
+                <strong>API host</strong>
+              </div>
+              <Activity size={20} />
+            </div>
+            <dl className="metricGrid">
+              <div>
+                <dt>Load</dt>
+                <dd>
+                  {systemStatus
+                    ? `${systemStatus.load_1m} / ${systemStatus.cpu_count}`
+                    : "Waiting"}
+                </dd>
+              </div>
+              <div>
+                <dt>Memory</dt>
+                <dd>{systemStatus ? `${systemStatus.memory_used_percent}%` : "Waiting"}</dd>
+              </div>
+              <div>
+                <dt>Disk</dt>
+                <dd>{systemStatus ? `${systemStatus.disk_used_percent}%` : "Waiting"}</dd>
+              </div>
+              <div>
+                <dt>Uptime</dt>
+                <dd>{formatUptime(systemStatus?.uptime_seconds)}</dd>
+              </div>
+              <div>
+                <dt>Queue</dt>
+                <dd>{systemStatus ? systemStatus.jobs_queued : 0}</dd>
+              </div>
+              <div>
+                <dt>Running</dt>
+                <dd>{systemStatus ? systemStatus.jobs_generating : 0}</dd>
+              </div>
+              <div>
+                <dt>Failed</dt>
+                <dd>{systemStatus ? systemStatus.jobs_failed : 0}</dd>
+              </div>
+              <div>
+                <dt>Done</dt>
+                <dd>{systemStatus ? systemStatus.jobs_completed : 0}</dd>
+              </div>
+              <div>
+                <dt>Worker</dt>
+                <dd>{systemStatus?.worker ? "Online" : "Offline"}</dd>
+              </div>
+              <div>
+                <dt>GPU Util</dt>
+                <dd>{primaryGpu ? `${primaryGpu.utilization_gpu_percent}%` : "Waiting"}</dd>
+              </div>
+              <div>
+                <dt>GPU VRAM</dt>
+                <dd>
+                  {primaryGpu
+                    ? `${Math.round(primaryGpu.memory_used_mib / 1024)} / ${Math.round(primaryGpu.memory_total_mib / 1024)} GB`
+                    : "Waiting"}
+                </dd>
+              </div>
+              <div>
+                <dt>GPU Temp</dt>
+                <dd>{primaryGpu ? `${primaryGpu.temperature_c} C` : "Waiting"}</dd>
+              </div>
+            </dl>
+            {systemStatus?.worker?.gpus && systemStatus.worker.gpus.length > 1 && (
+              <div className="gpuList">
+                {systemStatus.worker.gpus.map((gpu) => (
+                  <span key={gpu.index}>
+                    GPU {gpu.index}: {gpu.utilization_gpu_percent}% util,{" "}
+                    {Math.round(gpu.memory_used_mib / 1024)} GB VRAM, {gpu.temperature_c} C
+                  </span>
+                ))}
               </div>
             )}
           </section>
@@ -740,6 +892,14 @@ export default function Home() {
             <div>
               <dt>Stage</dt>
               <dd>{job?.status_message ?? "Waiting"}</dd>
+            </div>
+            <div>
+              <dt>Generation</dt>
+              <dd>{formatDuration(job?.generation_time_ms)}</dd>
+            </div>
+            <div>
+              <dt>Ranking</dt>
+              <dd>{formatDuration(job?.ranking_time_ms)}</dd>
             </div>
           </dl>
 

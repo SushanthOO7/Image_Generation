@@ -24,6 +24,8 @@ class Settings:
     concurrent_generation_limit: int = 2
     prompt_presets_path: str = "/app/model_configs/presets.yaml"
     quality_presets_path: str = "/app/model_configs/quality.yaml"
+    safety_config_path: str = "/app/model_configs/safety.yaml"
+    worker_health_timeout_seconds: float = 2.0
 
 
 def load_settings() -> Settings:
@@ -54,4 +56,6 @@ def load_settings() -> Settings:
         concurrent_generation_limit=int(os.getenv("CONCURRENT_GENERATION_LIMIT", "2")),
         prompt_presets_path=os.getenv("PROMPT_PRESETS_PATH", "/app/model_configs/presets.yaml"),
         quality_presets_path=os.getenv("QUALITY_PRESETS_PATH", "/app/model_configs/quality.yaml"),
+        safety_config_path=os.getenv("SAFETY_CONFIG_PATH", "/app/model_configs/safety.yaml"),
+        worker_health_timeout_seconds=float(os.getenv("WORKER_HEALTH_TIMEOUT_SECONDS", "2.0")),
     )

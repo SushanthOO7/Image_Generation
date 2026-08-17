@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: FLUX Platform
+    orgId: 1
+    folder: FLUX Platform
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /var/lib/grafana/dashboards
