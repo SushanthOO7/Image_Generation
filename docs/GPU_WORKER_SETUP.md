@@ -170,6 +170,18 @@ source .env.gpu-worker
 set +a
 ```
 
+Run the direct Python preflight before starting Celery:
+
+```bash
+python scripts/gpu_worker_preflight.py
+```
+
+This prints the `CUDA_VISIBLE_DEVICES` value, the CUDA devices visible to PyTorch,
+and whether `model_configs/flux2.yaml` references any GPU indexes that are not
+visible. If `CUDA_VISIBLE_DEVICES=1`, PyTorch exposes that selected physical GPU
+inside the process as `cuda:0`, so the model config should still use `cuda` or
+`cuda:0`.
+
 Test connectivity from the GPU server:
 
 ```bash
@@ -276,9 +288,23 @@ Replace `MAIN_SERVER_IP` with the server running `postgres`, `redis`, and `minio
 ```text
 RANKER_BACKEND=clip
 CLIP_RANKER_MODEL_ID=openai/clip-vit-base-patch32
+RANKER_FALLBACK_TO_HEURISTIC=true
 ```
 
 The CLIP ranker loads an additional model in the worker process, so test it after FLUX generation is stable.
+
+Validate ranking directly before enabling it in a long-running worker:
+
+```bash
+python scripts/validate_ranker.py --backend clip
+```
+
+Use strict mode if you want dependency/model loading failures to fail instead of
+falling back to the heuristic ranker:
+
+```bash
+python scripts/validate_ranker.py --backend clip --strict
+```
 
 ### Download The Model
 
@@ -298,6 +324,35 @@ The model downloads under:
 ```
 
 The worker config uses `local_files_only: true`, so generation will use local files after download.
+
+### Validate Real FLUX Runtime
+
+Before starting Celery, run one direct FLUX generation on the GPU server:
+
+```bash
+set -a
+source .env.gpu-worker
+set +a
+python scripts/gpu_worker_preflight.py
+python scripts/validate_flux_runtime.py --width 512 --height 512 --steps 4
+```
+
+The validation output is written to:
+
+```text
+generated/flux-runtime-validation.webp
+```
+
+To also verify MinIO upload credentials and network access:
+
+```bash
+python scripts/validate_flux_runtime.py --width 512 --height 512 --steps 4 --upload
+```
+
+If this fails with `CUDA error: invalid device ordinal`, check
+`CUDA_VISIBLE_DEVICES` and the `max_memory_gpu_N` entries in
+`model_configs/flux2.yaml`. A process with `CUDA_VISIBLE_DEVICES=1` still uses
+`cuda:0` internally.
 
 ### Start The GPU Worker
 

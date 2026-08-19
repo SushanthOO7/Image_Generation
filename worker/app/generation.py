@@ -1,10 +1,13 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from hashlib import sha256
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
-from backend.app.models import GenerationJob
-from worker.app.image_renderer import render_placeholder_image
 from worker.app.settings import WorkerSettings
+
+if TYPE_CHECKING:
+    from backend.app.models import GenerationJob
 
 
 @dataclass(frozen=True)
@@ -28,6 +31,8 @@ class ImageGenerator(Protocol):
 
 class MockImageGenerator:
     def generate(self, job: GenerationJob, candidate_index: int = 1) -> GeneratedImage:
+        from worker.app.image_renderer import render_placeholder_image
+
         width = job.width or 1024
         height = job.height or 1024
         seed = derive_candidate_seed(job, candidate_index)

@@ -19,6 +19,10 @@ Included now:
 - Authenticated generation and feedback tied to `users.id`.
 - Redis-backed per-user generation rate limit.
 - Per-user concurrent generation limit.
+- User plans for free/pro/team generation limits.
+- Monthly generation quota accounting per user and plan.
+- User-managed API keys for programmatic generation access.
+- Frontend API key creation, one-time secret reveal, copy, and revoke controls.
 - FastAPI health and mock generation endpoints backed by PostgreSQL.
 - SQLAlchemy models for users, generation jobs, outputs, and feedback.
 - Alembic migration for the initial database schema.
@@ -50,15 +54,15 @@ Included now:
 - FLUX.2 download helper in `scripts/download_flux2.py`.
 - Remote GPU worker setup guide in `docs/GPU_WORKER_SETUP.md`.
 - Direct Python GPU worker path uses the same `.env.gpu-worker` file as Docker.
+- Direct Python GPU worker preflight for CUDA visibility and model config checks.
+- Direct FLUX runtime validation script for one real GPU generation before Celery startup.
 - FLUX generator now uses planned job width, height, steps, and guidance.
 - Optional ML dependency file in `worker/requirements-ml.txt`.
 - Dependency manifests for backend, worker, and frontend.
 
 Not included yet:
 
-- Real FLUX.2 runtime validation on GPU.
-- Real image ranking model; mock candidates currently use deterministic placeholder scores.
-- API keys and paid/free plan limits.
+- Billing integration.
 
 ## Repository Layout
 
@@ -77,7 +81,7 @@ scripts/        Operational and benchmark scripts
 Validate the Compose file:
 
 ```bash
-docker compose config --quiet
+scripts/ops.sh compose-config
 ```
 
 Start the stack:
@@ -89,7 +93,7 @@ docker compose up -d --build frontend api postgres redis minio adminer
 Apply database migrations:
 
 ```bash
-docker compose exec api alembic -c backend/alembic.ini upgrade head
+scripts/ops.sh migrate
 ```
 
 Open the frontend at the value of `FRONTEND_PUBLIC_URL`, usually `http://localhost:3001`.
@@ -99,6 +103,8 @@ From the frontend you can verify:
 - Register or login.
 - API health.
 - Active job and limit counters.
+- Monthly quota remaining for the signed-in user.
+- API key management for programmatic generation access.
 - Prompt submission.
 - Active job cancellation.
 - Redis/Celery job progress.
@@ -149,10 +155,61 @@ Check the active worker backend:
 docker compose exec worker python -c "from worker.app.settings import load_worker_settings; from worker.app.health import worker_health; print(worker_health(load_worker_settings()))"
 ```
 
+Create an API key after logging in:
+
+```bash
+curl -X POST http://localhost:8000/v1/me/api-keys \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <jwt_token>" \
+  -d '{"name":"local script"}'
+```
+
+Use the returned `flux_sk_...` secret as a bearer token for generation requests:
+
+```bash
+curl -X POST http://localhost:8000/v1/generations \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <flux_sk_api_key>" \
+  -d '{"prompt":"A cinematic product photograph of an ice sculpture","quality":"fast"}'
+```
+
+Admins can move a user between built-in plans:
+
+```bash
+curl -X PATCH http://localhost:8000/v1/admin/users/<user_id>/plan \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <admin_jwt_token>" \
+  -d '{"plan":"pro"}'
+```
+
 To attempt real FLUX inference, follow:
 
 ```text
 docs/GPU_WORKER_SETUP.md
+```
+
+For the direct Python worker path, copy `.env.gpu-worker.example` to
+`.env.gpu-worker`, edit the main server addresses, then run:
+
+```bash
+python scripts/gpu_worker_preflight.py
+python scripts/validate_flux_runtime.py --width 512 --height 512 --steps 4
+python scripts/validate_ranker.py --backend clip
+```
+
+The same operational checks are available through:
+
+```bash
+scripts/ops.sh check
+scripts/ops.sh gpu-preflight
+scripts/ops.sh gpu-validate --width 512 --height 512 --steps 4
+scripts/ops.sh worker-start
+```
+
+To require a real smoke generation before the direct Python worker starts, set this in `.env.gpu-worker`:
+
+```text
+FLUX_VALIDATE_RUNTIME_ON_START=true
 ```
 
 At a high level, install the optional ML dependencies in the GPU worker image, mount model files under `models/`, then set:

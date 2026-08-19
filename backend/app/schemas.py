@@ -9,6 +9,37 @@ class UserResponse(BaseModel):
     id: str
     email: str
     role: str
+    plan: str
+
+
+class ApiKeyCreateRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=128)
+
+
+class ApiKeyResponse(BaseModel):
+    id: str
+    name: str
+    key_prefix: str
+    created_at: datetime
+    last_used_at: datetime | None = None
+    revoked_at: datetime | None = None
+
+
+class ApiKeyCreateResponse(ApiKeyResponse):
+    api_key: str
+
+
+class ApiKeyListResponse(BaseModel):
+    api_keys: list[ApiKeyResponse]
+
+
+class ApiKeyRevokeResponse(BaseModel):
+    id: str
+    revoked_at: datetime
+
+
+class UpdateUserPlanRequest(BaseModel):
+    plan: Literal["free", "pro", "team"]
 
 
 class GenerationLimitsResponse(BaseModel):
@@ -17,6 +48,10 @@ class GenerationLimitsResponse(BaseModel):
     rate_limit_reset_seconds: int
     concurrent_limit: int
     active_jobs: int
+    monthly_quota: int
+    monthly_used: int
+    monthly_remaining: int
+    monthly_reset_at: datetime
 
 
 class AuthRequest(BaseModel):

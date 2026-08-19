@@ -27,10 +27,17 @@
     "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
-    ".next/types/**/*.ts",
-    ".next/dev/types/**/*.ts"
+    ".next-codex-build/types/**/*.ts",
+    ".next-codex-build/dev/types/**/*.ts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    ".next",
+    ".next-local",
+    ".next-build",
+    ".next-prod",
+    ".next-codex-build",
+    ".next.failed-nobody-owned",
+    ".next.stale-nobody-owned"
   ]
 }

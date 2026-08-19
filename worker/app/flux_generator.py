@@ -1,7 +1,13 @@
-from backend.app.models import GenerationJob
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from worker.app.generation import GeneratedImage, derive_candidate_seed
 from worker.app.model_manager import FluxModelManager
 from worker.app.settings import WorkerSettings
+
+if TYPE_CHECKING:
+    from backend.app.models import GenerationJob
 
 
 class FluxImageGenerator:

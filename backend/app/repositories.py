@@ -1,27 +1,46 @@
 from datetime import UTC, datetime
+import hmac
+from hashlib import sha256
 from secrets import randbelow
 from uuid import uuid4
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
-from backend.app.models import GenerationFeedback, GenerationJob, GenerationOutput, User
+from backend.app.models import ApiKey, GenerationFeedback, GenerationJob, GenerationOutput, GenerationUsageMonth, User
 from backend.app.prompting import build_generation_plan
 from backend.app.schemas import GenerationRequest, GenerationStatus
+from backend.app.settings import load_settings
+
+settings = load_settings()
+
+
+def normalize_email(email: str) -> str:
+    return email.strip().lower()
 
 
 def get_user_by_email(db: Session, email: str) -> User | None:
-    return db.scalar(select(User).where(User.email == email.lower()))
+    return db.scalar(select(User).where(User.email == normalize_email(email)))
 
 
 def get_user_by_id(db: Session, user_id: str) -> User | None:
     return db.get(User, user_id)
 
 
+def update_user_plan(db: Session, user_id: str, plan: str) -> User | None:
+    user = db.get(User, user_id)
+    if user is None:
+        return None
+    user.plan = plan
+    db.commit()
+    db.refresh(user)
+    return user
+
+
 def create_user(db: Session, email: str, password_hash: str) -> User:
     user = User(
         id=f"user_{uuid4().hex[:12]}",
-        email=email.lower(),
+        email=normalize_email(email),
         password_hash=password_hash,
         role="user",
     )
@@ -29,6 +48,138 @@ def create_user(db: Session, email: str, password_hash: str) -> User:
     db.commit()
     db.refresh(user)
     return user
+
+
+def hash_api_key(api_key: str) -> str:
+    return hmac.new(
+        settings.api_key_hash_secret.encode("utf-8"),
+        api_key.encode("utf-8"),
+        sha256,
+    ).hexdigest()
+
+
+def create_api_key(db: Session, user_id: str, name: str, api_key: str) -> ApiKey:
+    key = ApiKey(
+        id=f"key_{uuid4().hex[:12]}",
+        user_id=user_id,
+        name=name.strip(),
+        key_prefix=api_key[:16],
+        key_hash=hash_api_key(api_key),
+    )
+    db.add(key)
+    db.commit()
+    db.refresh(key)
+    return key
+
+
+def current_usage_month(now: datetime | None = None) -> str:
+    current = now or datetime.now(UTC)
+    return current.strftime("%Y-%m")
+
+
+def next_usage_month_start(now: datetime | None = None) -> datetime:
+    current = now or datetime.now(UTC)
+    year = current.year + 1 if current.month == 12 else current.year
+    month = 1 if current.month == 12 else current.month + 1
+    return datetime(year, month, 1, tzinfo=UTC)
+
+
+def get_monthly_generation_usage(db: Session, user_id: str, month: str | None = None) -> int:
+    usage_month = month or current_usage_month()
+    statement = select(GenerationUsageMonth.submitted_generations).where(
+        GenerationUsageMonth.user_id == user_id,
+        GenerationUsageMonth.month == usage_month,
+    )
+    return int(db.scalar(statement) or 0)
+
+
+def reserve_monthly_generation_quota(
+    db: Session,
+    user_id: str,
+    monthly_quota: int,
+    month: str | None = None,
+) -> tuple[bool, int]:
+    if monthly_quota < 0:
+        return True, get_monthly_generation_usage(db, user_id, month)
+
+    usage_month = month or current_usage_month()
+    statement = select(GenerationUsageMonth).where(
+        GenerationUsageMonth.user_id == user_id,
+        GenerationUsageMonth.month == usage_month,
+    )
+    usage = db.scalar(statement.with_for_update())
+    if usage is None:
+        usage = GenerationUsageMonth(
+            id=f"usage_{uuid4().hex[:12]}",
+            user_id=user_id,
+            month=usage_month,
+            submitted_generations=0,
+        )
+        db.add(usage)
+        db.flush()
+
+    if usage.submitted_generations >= monthly_quota:
+        db.rollback()
+        return False, usage.submitted_generations
+
+    usage.submitted_generations += 1
+    usage.updated_at = datetime.now(UTC)
+    db.commit()
+    return True, usage.submitted_generations
+
+
+def release_monthly_generation_quota(
+    db: Session,
+    user_id: str,
+    monthly_quota: int,
+    month: str | None = None,
+) -> int:
+    if monthly_quota < 0:
+        return get_monthly_generation_usage(db, user_id, month)
+
+    usage_month = month or current_usage_month()
+    statement = select(GenerationUsageMonth).where(
+        GenerationUsageMonth.user_id == user_id,
+        GenerationUsageMonth.month == usage_month,
+    )
+    usage = db.scalar(statement.with_for_update())
+    if usage is None:
+        return 0
+
+    usage.submitted_generations = max(usage.submitted_generations - 1, 0)
+    usage.updated_at = datetime.now(UTC)
+    db.commit()
+    return usage.submitted_generations
+
+
+def get_active_api_key_by_secret(db: Session, api_key: str) -> ApiKey | None:
+    statement = select(ApiKey).where(
+        ApiKey.key_hash == hash_api_key(api_key),
+        ApiKey.revoked_at.is_(None),
+    )
+    return db.scalar(statement)
+
+
+def list_api_keys(db: Session, user_id: str) -> list[ApiKey]:
+    statement = select(ApiKey).where(ApiKey.user_id == user_id).order_by(ApiKey.created_at.desc())
+    return list(db.scalars(statement))
+
+
+def touch_api_key(db: Session, api_key: ApiKey) -> ApiKey:
+    api_key.last_used_at = datetime.now(UTC)
+    db.commit()
+    db.refresh(api_key)
+    return api_key
+
+
+def revoke_api_key(db: Session, user_id: str, key_id: str) -> ApiKey | None:
+    key = db.get(ApiKey, key_id)
+    if key is None or key.user_id != user_id:
+        return None
+    key.revoked_at = key.revoked_at or datetime.now(UTC)
+    db.commit()
+    db.refresh(key)
+    return key
 
 
 def create_generation_job(

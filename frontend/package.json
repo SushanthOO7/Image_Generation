@@ -4,8 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev --hostname 0.0.0.0 -p ${FRONTEND_PORT:-3001}",
-    "build": "next build",
-    "lint": "next lint"
+    "build": "npm run typecheck && next build",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit --pretty false"
   },
   "dependencies": {
     "next": "16.3.0",

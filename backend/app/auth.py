@@ -1,4 +1,5 @@
 from datetime import UTC, datetime, timedelta
+import secrets
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -8,12 +9,13 @@ from sqlalchemy.orm import Session
 
 from backend.app.database import get_db
 from backend.app.models import User
-from backend.app.repositories import get_user_by_id
+from backend.app.repositories import get_active_api_key_by_secret, get_user_by_id, touch_api_key
 from backend.app.settings import load_settings
 
 settings = load_settings()
 password_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 bearer_scheme = HTTPBearer()
+API_KEY_PREFIX = "flux_sk_"
 
 
 def hash_password(password: str) -> str:
@@ -34,11 +36,25 @@ def create_access_token(user: User) -> str:
     return jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
 
 
+def create_api_key_secret() -> str:
+    return f"{API_KEY_PREFIX}{secrets.token_urlsafe(32)}"
+
+
 def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
     db: Session = Depends(get_db),
 ) -> User:
     token = credentials.credentials
+    if token.startswith(API_KEY_PREFIX):
+        api_key = get_active_api_key_by_secret(db, token)
+        if api_key is None:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid API key")
+        user = get_user_by_id(db, api_key.user_id)
+        if user is None:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="API key user not found")
+        touch_api_key(db, api_key)
+        return user
+
     try:
         payload = jwt.decode(token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])
         user_id = payload.get("sub")

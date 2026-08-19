@@ -1,12 +1,14 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from io import BytesIO
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
-from PIL import Image
-
-from backend.app.models import GenerationJob
 from worker.app.generation import GeneratedImage
 from worker.app.settings import WorkerSettings
+
+if TYPE_CHECKING:
+    from backend.app.models import GenerationJob
 
 
 @dataclass(frozen=True)
@@ -55,9 +57,11 @@ class HeuristicRanker:
 class ClipRanker:
     def __init__(self, model_id: str) -> None:
         import torch
+        import torch.nn.functional as functional
         from transformers import CLIPModel, CLIPProcessor
 
         self.torch = torch
+        self.functional = functional
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.processor = CLIPProcessor.from_pretrained(model_id)
         self.model = CLIPModel.from_pretrained(model_id).to(self.device)
@@ -70,17 +74,25 @@ class ClipRanker:
         candidate_index: int,
         candidate_count: int,
     ) -> CandidateScore:
+        from PIL import Image
+
         prompt = job.expanded_prompt or job.original_prompt
         with Image.open(BytesIO(generated.image_bytes)) as image:
             image = image.convert("RGB")
             inputs = self.processor(text=[prompt], images=[image], return_tensors="pt", padding=True)
         inputs = {key: value.to(self.device) for key, value in inputs.items()}
         with self.torch.no_grad():
-            outputs = self.model(**inputs)
-            similarity = outputs.logits_per_image.softmax(dim=1)[0, 0].item()
+            text_features = self.model.get_text_features(
+                input_ids=inputs["input_ids"],
+                attention_mask=inputs.get("attention_mask"),
+            )
+            image_features = self.model.get_image_features(pixel_values=inputs["pixel_values"])
+            text_features = self.functional.normalize(text_features, p=2, dim=-1)
+            image_features = self.functional.normalize(image_features, p=2, dim=-1)
+            cosine_similarity = (image_features * text_features).sum(dim=-1)[0].item()
 
         aspect_balance = min(generated.width, generated.height) / max(generated.width, generated.height)
-        prompt_alignment_score = max(0.0, min(similarity, 1.0))
+        prompt_alignment_score = max(0.0, min((cosine_similarity + 1.0) / 2.0, 1.0))
         aesthetic_score = min(0.78 + aspect_balance * 0.12 + (candidate_count - candidate_index) * 0.01, 0.98)
         quality_score = min(0.82 + candidate_index * 0.01, 0.98)
         final_score = round(
@@ -97,5 +109,10 @@ class ClipRanker:
 
 def build_ranker(settings: WorkerSettings) -> CandidateRanker:
     if settings.ranker_backend == "clip":
-        return ClipRanker(settings.clip_ranker_model_id)
+        try:
+            return ClipRanker(settings.clip_ranker_model_id)
+        except Exception:
+            if settings.ranker_fallback_to_heuristic:
+                return HeuristicRanker()
+            raise
     return HeuristicRanker()
