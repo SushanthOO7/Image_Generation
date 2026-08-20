@@ -38,6 +38,7 @@ services:
       -A worker.app.celery_app
       worker
       --loglevel=info
+      --pool=solo
       -Q generation:high,generation:normal,generation:low
       -c 1
     env_file:

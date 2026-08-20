@@ -45,14 +45,8 @@ export default function Home() {
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("demo@example.com");
   const [password, setPassword] = useState("password123");
-  const [accessToken, setAccessToken] = useState<string | null>(() => {
-    if (typeof window === "undefined") return null;
-    return window.localStorage.getItem("flux_access_token");
-  });
-  const [userEmail, setUserEmail] = useState<string | null>(() => {
-    if (typeof window === "undefined") return null;
-    return window.localStorage.getItem("flux_user_email");
-  });
+  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
   const [limits, setLimits] = useState<LimitsResponse | null>(null);
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
   const [newApiKeyName, setNewApiKeyName] = useState("local script");
@@ -457,10 +451,15 @@ export default function Home() {
   }
 
   useEffect(() => {
-    if (accessToken) {
-      refreshLimits(accessToken).catch(() => undefined);
-      refreshApiKeys(accessToken).catch(() => undefined);
-      refreshHistory(accessToken).catch(() => undefined);
+    const storedAccessToken = window.localStorage.getItem("flux_access_token");
+    const storedUserEmail = window.localStorage.getItem("flux_user_email");
+
+    if (storedAccessToken) {
+      setAccessToken(storedAccessToken);
+      setUserEmail(storedUserEmail);
+      refreshLimits(storedAccessToken).catch(() => undefined);
+      refreshApiKeys(storedAccessToken).catch(() => undefined);
+      refreshHistory(storedAccessToken).catch(() => undefined);
     }
     checkHealth();
     refreshSystemStatus().catch(() => undefined);

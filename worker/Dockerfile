@@ -12,4 +12,4 @@ COPY backend /app/backend
 COPY worker /app/worker
 COPY model_configs /app/model_configs
 
-CMD ["celery", "-A", "worker.app.celery_app", "worker", "--loglevel=info", "-Q", "generation:high,generation:normal,generation:low", "-c", "1"]
+CMD ["celery", "-A", "worker.app.celery_app", "worker", "--loglevel=info", "--pool=solo", "-Q", "generation:high,generation:normal,generation:low", "-c", "1"]
